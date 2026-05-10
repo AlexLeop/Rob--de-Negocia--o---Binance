@@ -38,7 +38,6 @@ st.sidebar.divider()
 # Ajuste Dinâmico de Parâmetros
 st.sidebar.subheader("Configuração da Operação")
 
-# SOLUÇÃO DO BUG: Removemos o 'key' e usamos 'value' para alimentar o campo com a memória
 new_sym_a = st.sidebar.text_input("Ativo A", value=st.session_state.sym_a)
 new_sym_b = st.sidebar.text_input("Ativo B", value=st.session_state.sym_b)
 
@@ -48,7 +47,6 @@ new_stop = st.sidebar.number_input("Stop Loss (US$)", value=float(db.get_config(
 new_adx = st.sidebar.number_input("Limite Máximo do ADX", value=float(db.get_config("ADX_LIMIT") or 25.0), step=1.0)
 
 if st.sidebar.button("💾 Salvar Parâmetros"):
-    # Atualiza tanto a memória temporária (para não sumir) quanto o banco de dados (para o robô)
     st.session_state.sym_a = new_sym_a.upper()
     st.session_state.sym_b = new_sym_b.upper()
     db.update_config("SYMBOL_A", new_sym_a.upper())
@@ -114,7 +112,7 @@ with tab2:
         
         st.dataframe(
             df_scan.style.map(color_status, subset=['Status']),
-            use_container_width=True,
+            width='stretch',
             hide_index=True
         )
         
@@ -129,7 +127,6 @@ with tab2:
                 with cols[idx]:
                     btn_label = f"Carregar {row['Ativo A']} x {row['Ativo B']}"
                     if st.button(btn_label, use_container_width=True):
-                        # Agora o Streamlit aceita a mudança pacificamente!
                         st.session_state.sym_a = row['Ativo A']
                         st.session_state.sym_b = row['Ativo B']
                         st.rerun()

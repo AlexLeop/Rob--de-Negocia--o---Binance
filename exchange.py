@@ -25,6 +25,16 @@ class BinanceExecutor:
                 'minQty': float(lot_filter['minQty']) if lot_filter else 0.0
             }
 
+    async def get_usdt_balance(self) -> float:
+        try:
+            balances = await self.client.futures_account_balance()
+            for b in balances:
+                if b['asset'] == 'USDT':
+                    return float(b['balance'])
+        except Exception as e:
+            print(f"Erro ao buscar saldo: {e}")
+        return 0.0
+
     async def setup_symbol(self, symbol: str, leverage: int):
         """Configura alavancagem e modo de margem cruzada (CROSSED)."""
         try:
@@ -122,13 +132,3 @@ class BinanceExecutor:
             print(f"🏁 [{symbol}] Posição ZERADA ({side} {abs_qty}).")
         except Exception as e:
             print(f"🚨 Erro ao fechar posição em {symbol}: {e}")
-
-async def get_usdt_balance(self) -> float:
-        try:
-            balances = await self.client.futures_account_balance()
-            for b in balances:
-                if b['asset'] == 'USDT':
-                    return float(b['balance'])
-        except Exception as e:
-            print(f"Erro ao buscar saldo: {e}")
-        return 0.0
