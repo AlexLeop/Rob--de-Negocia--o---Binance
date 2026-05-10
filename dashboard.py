@@ -7,7 +7,7 @@ db.init_db()
 st.set_page_config(page_title="Quant Bot Manager", layout="wide")
 st.title("⚡ Painel de Controle - Arbitragem Estatística")
 
-# --- MEMÓRIA DO PAINEL (Evita que a tabela suma e permite o autopreenchimento) ---
+# --- MEMÓRIA DO PAINEL ---
 if "sym_a" not in st.session_state:
     st.session_state.sym_a = db.get_config("SYMBOL_A") or "ADAUSDT"
 if "sym_b" not in st.session_state:
@@ -30,7 +30,7 @@ st.sidebar.markdown(f"**Status Atual:** {'✅ RODANDO' if is_running else '💤 
 st.sidebar.warning("⚠️ Desligue o robô antes de trocar os pares.")
 st.sidebar.divider()
 
-# --- SALDO DA CONTA (Adicionado da última etapa) ---
+# --- SALDO DA CONTA ---
 current_balance = db.get_config("LIVE_BALANCE") or "0.00"
 st.sidebar.metric("Saldo Binance (Futuros)", f"US$ {current_balance}")
 st.sidebar.divider()
@@ -38,9 +38,9 @@ st.sidebar.divider()
 # Ajuste Dinâmico de Parâmetros
 st.sidebar.subheader("Configuração da Operação")
 
-# Usamos a "key" para interligar os campos com a memória de autopreenchimento
-new_sym_a = st.sidebar.text_input("Ativo A", key="sym_a")
-new_sym_b = st.sidebar.text_input("Ativo B", key="sym_b")
+# SOLUÇÃO DO BUG: Removemos o 'key' e usamos 'value' para alimentar o campo com a memória
+new_sym_a = st.sidebar.text_input("Ativo A", value=st.session_state.sym_a)
+new_sym_b = st.sidebar.text_input("Ativo B", value=st.session_state.sym_b)
 
 new_amount = st.sidebar.number_input("Exposição (US$)", value=float(db.get_config("TRADE_AMOUNT_USD") or 6.0), step=1.0)
 new_target = st.sidebar.number_input("Alvo (US$)", value=float(db.get_config("TARGET_PNL_USD") or 0.60), step=0.10)
@@ -48,6 +48,9 @@ new_stop = st.sidebar.number_input("Stop Loss (US$)", value=float(db.get_config(
 new_adx = st.sidebar.number_input("Limite Máximo do ADX", value=float(db.get_config("ADX_LIMIT") or 25.0), step=1.0)
 
 if st.sidebar.button("💾 Salvar Parâmetros"):
+    # Atualiza tanto a memória temporária (para não sumir) quanto o banco de dados (para o robô)
+    st.session_state.sym_a = new_sym_a.upper()
+    st.session_state.sym_b = new_sym_b.upper()
     db.update_config("SYMBOL_A", new_sym_a.upper())
     db.update_config("SYMBOL_B", new_sym_b.upper())
     db.update_config("TRADE_AMOUNT_USD", str(new_amount))
@@ -60,7 +63,6 @@ if st.sidebar.button("💾 Salvar Parâmetros"):
 tab1, tab2 = st.tabs(["📈 Dashboard de Resultados", "📡 Radar de Cointegração"])
 
 with tab1:
-    # --- MONITORAMENTO AO VIVO ---
     st.subheader("📡 Radar Ao Vivo do Robô")
     
     z_score = db.get_config("LIVE_ZSCORE") or "0.00"
@@ -77,7 +79,6 @@ with tab1:
 
     st.divider()
 
-    # --- HISTÓRICO DE TRADES ---
     st.subheader("📊 Histórico de Operações")
     df_trades = db.get_pnl_history()
     col1, col2, col3 = st.columns(3)
@@ -101,10 +102,8 @@ with tab2:
     
     if st.button("🔍 Iniciar Varredura de Cointegração"):
         with st.spinner("Baixando histórico da Binance e calculando Engle-Granger. Isso pode levar alguns segundos..."):
-            # Salva o resultado na memória da sessão para não sumir
             st.session_state.scan_results = scanner.run_market_scan()
             
-    # Se já existir uma varredura salva na memória, renderiza a tabela
     if st.session_state.scan_results is not None:
         df_scan = st.session_state.scan_results
         
@@ -119,11 +118,9 @@ with tab2:
             hide_index=True
         )
         
-        # --- BOTÕES DE AUTOPREENCHIMENTO ---
         st.markdown("#### ⚡ Seleção Rápida")
         st.write("Clique em um dos melhores pares abaixo para autopreencher a barra lateral.")
         
-        # Filtra os 3 melhores pares da tabela
         df_top = df_scan[df_scan['Status'].str.contains('✅|⚠️')].head(3)
         
         if not df_top.empty:
@@ -131,8 +128,8 @@ with tab2:
             for idx, row in enumerate(df_top.to_dict('records')):
                 with cols[idx]:
                     btn_label = f"Carregar {row['Ativo A']} x {row['Ativo B']}"
-                    # Ao clicar, atualiza a memória e recarrega a barra lateral
                     if st.button(btn_label, use_container_width=True):
+                        # Agora o Streamlit aceita a mudança pacificamente!
                         st.session_state.sym_a = row['Ativo A']
                         st.session_state.sym_b = row['Ativo B']
                         st.rerun()
