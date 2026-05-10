@@ -24,12 +24,12 @@ st.sidebar.divider()
 
 # Ajuste Dinâmico de Parâmetros
 st.sidebar.subheader("Configuração da Operação")
-new_sym_a = st.sidebar.text_input("Ativo A", value=db.get_config("SYMBOL_A"))
-new_sym_b = st.sidebar.text_input("Ativo B", value=db.get_config("SYMBOL_B"))
-new_amount = st.sidebar.number_input("Exposição (US$)", value=float(db.get_config("TRADE_AMOUNT_USD")), step=1.0)
-new_target = st.sidebar.number_input("Alvo (US$)", value=float(db.get_config("TARGET_PNL_USD")), step=0.10)
-new_stop = st.sidebar.number_input("Stop Loss (US$)", value=float(db.get_config("STOP_LOSS_USD")), step=1.0)
-new_adx = st.sidebar.number_input("Limite Máximo do ADX", value=float(db.get_config("ADX_LIMIT")), step=1.0)
+new_sym_a = st.sidebar.text_input("Ativo A", value=db.get_config("SYMBOL_A") or "SOLUSDT")
+new_sym_b = st.sidebar.text_input("Ativo B", value=db.get_config("SYMBOL_B") or "AVAXUSDT")
+new_amount = st.sidebar.number_input("Exposição (US$)", value=float(db.get_config("TRADE_AMOUNT_USD") or 5.0), step=1.0)
+new_target = st.sidebar.number_input("Alvo (US$)", value=float(db.get_config("TARGET_PNL_USD") or 0.60), step=0.10)
+new_stop = st.sidebar.number_input("Stop Loss (US$)", value=float(db.get_config("STOP_LOSS_USD") or 4.0), step=1.0)
+new_adx = st.sidebar.number_input("Limite Máximo do ADX", value=float(db.get_config("ADX_LIMIT") or 25.0), step=1.0)
 
 if st.sidebar.button("💾 Salvar Parâmetros"):
     db.update_config("SYMBOL_A", new_sym_a.upper())
@@ -44,6 +44,26 @@ if st.sidebar.button("💾 Salvar Parâmetros"):
 tab1, tab2 = st.tabs(["📈 Dashboard de Resultados", "📡 Radar de Cointegração"])
 
 with tab1:
+    # --- MONITORAMENTO AO VIVO ---
+    st.subheader("📡 Radar Ao Vivo do Robô")
+    
+    # Lê os dados em tempo real do banco
+    z_score = db.get_config("LIVE_ZSCORE") or "0.00"
+    adx_val = db.get_config("LIVE_ADX") or "0.00"
+    live_status = db.get_config("LIVE_STATUS") or "Aguardando primeira leitura..."
+    
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Z-Score Atual (Alvo: ±2.50)", z_score)
+    c2.metric("ADX Atual (Limite: < 25)", adx_val)
+    c3.info(f"**Status:** {live_status}")
+    
+    if st.button("🔄 Atualizar Leitura"):
+        st.rerun()
+
+    st.divider()
+
+    # --- HISTÓRICO DE TRADES ---
+    st.subheader("📊 Histórico de Operações")
     df_trades = db.get_pnl_history()
     col1, col2, col3 = st.columns(3)
     if not df_trades.empty:
@@ -51,23 +71,6 @@ with tab1:
         total_profit = df_trades['pnl_usd'].sum()
         win_rate = (len(df_trades[df_trades['pnl_usd'] > 0]) / total_trades) * 100
         
-        # --- NOVO BLOCO: MONITORAMENTO AO VIVO ---
-        st.divider()
-        st.subheader("📡 Radar Ao Vivo do Robô")
-        
-        # Lê os dados em tempo real do banco
-        z_score = db.get_config("LIVE_ZSCORE") or "0.00"
-        adx_val = db.get_config("LIVE_ADX") or "0.00"
-        live_status = db.get_config("LIVE_STATUS") or "Aguardando primeira leitura..."
-        
-        c1, c2, c3 = st.columns(3)
-        c1.metric("Z-Score Atual (Alvo: ±2.50)", z_score)
-        c2.metric("ADX Atual (Limite: < 25)", adx_val)
-        c3.info(f"**Status:** {live_status}")
-        
-        if st.button("🔄 Atualizar Leitura"):
-            st.rerun()
-
         col1.metric("Lucro Líquido Total", f"US$ {total_profit:.2f}")
         col2.metric("Ciclos Fechados", f"{total_trades}")
         col3.metric("Taxa de Acerto", f"{win_rate:.1f}%")
