@@ -51,6 +51,23 @@ with tab1:
         total_profit = df_trades['pnl_usd'].sum()
         win_rate = (len(df_trades[df_trades['pnl_usd'] > 0]) / total_trades) * 100
         
+        # --- NOVO BLOCO: MONITORAMENTO AO VIVO ---
+        st.divider()
+        st.subheader("📡 Radar Ao Vivo do Robô")
+        
+        # Lê os dados em tempo real do banco
+        z_score = db.get_config("LIVE_ZSCORE") or "0.00"
+        adx_val = db.get_config("LIVE_ADX") or "0.00"
+        live_status = db.get_config("LIVE_STATUS") or "Aguardando primeira leitura..."
+        
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Z-Score Atual (Alvo: ±2.50)", z_score)
+        c2.metric("ADX Atual (Limite: < 25)", adx_val)
+        c3.info(f"**Status:** {live_status}")
+        
+        if st.button("🔄 Atualizar Leitura"):
+            st.rerun()
+
         col1.metric("Lucro Líquido Total", f"US$ {total_profit:.2f}")
         col2.metric("Ciclos Fechados", f"{total_trades}")
         col3.metric("Taxa de Acerto", f"{win_rate:.1f}%")

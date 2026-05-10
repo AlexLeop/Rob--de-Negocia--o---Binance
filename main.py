@@ -112,6 +112,7 @@ async def main():
                     if not isinstance(results[0], Exception):
                         print(f"Desfazendo compra/venda de {current_symbol_a}...")
                         await executor.close_position(pos_a)
+
                     if not isinstance(results[1], Exception):
                         print(f"Desfazendo compra/venda de {current_symbol_b}...")
                         await executor.close_position(pos_b)
@@ -120,8 +121,13 @@ async def main():
                 
                 await asyncio.sleep(10) # Pausa para a Binance processar as posições
             else:
-                # Log de monitoramento
-                print(f"📡 Monitorando {current_symbol_a}/{current_symbol_b} | Z-Score: {signals['z_score']:.2f} | ADX: {signals['adx']:.2f}", end='\r')
+                # Envia o "batimento cardíaco" em tempo real para o Painel
+                status_msg = f"Aguardando distorção em {current_symbol_a} e {current_symbol_b}"
+                await db.update_config_async("LIVE_STATUS", status_msg)
+                await db.update_config_async("LIVE_ZSCORE", f"{signals['z_score']:.2f}")
+                await db.update_config_async("LIVE_ADX", f"{signals['adx']:.2f}")
+                
+                print(f"📡 {status_msg} | Z-Score: {signals['z_score']:.2f} | ADX: {signals['adx']:.2f}")
                 await asyncio.sleep(5)
 
         except Exception as e:

@@ -107,3 +107,6 @@ def get_pnl_history() -> pd.DataFrame:
         return df
     finally:
         conn.close()
+
+async def update_config_async(key: str, value: str):
+    await asyncio.to_thread(update_config, key, value)        
