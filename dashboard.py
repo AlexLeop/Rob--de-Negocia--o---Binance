@@ -35,14 +35,21 @@ current_balance = db.get_config("LIVE_BALANCE") or "0.00"
 st.sidebar.metric("Saldo Binance (Futuros)", f"US$ {current_balance}")
 st.sidebar.divider()
 
-# Ajuste Dinâmico de Parâmetros
+# --- AJUSTE DINÂMICO DE PARÂMETROS ---
 st.sidebar.subheader("Configuração da Operação")
 
-new_sym_a = st.sidebar.text_input("Ativo A", value=st.session_state.sym_a)
-new_sym_b = st.sidebar.text_input("Ativo B", value=st.session_state.sym_b)
+new_sym_a = st.sidebar.text_input("Ativo A (Ex: FETUSDT, ADAUSDT)", value=st.session_state.sym_a)
+new_sym_b = st.sidebar.text_input("Ativo B (Ex: GRTUSDT, XRPUSDT)", value=st.session_state.sym_b)
 
-new_amount = st.sidebar.number_input("Exposição (US$)", value=float(db.get_config("TRADE_AMOUNT_USD") or 6.0), step=1.0)
-new_target = st.sidebar.number_input("Alvo (US$)", value=float(db.get_config("TARGET_PNL_USD") or 0.60), step=0.10)
+# Novos Parâmetros HFT (High Frequency Trading) expostos no painel
+opcoes_tempo = ["1m", "3m", "5m", "15m", "1h"]
+tempo_atual = db.get_config("TIMEFRAME") or "5m"
+new_timeframe = st.sidebar.selectbox("Tempo Gráfico", opcoes_tempo, index=opcoes_tempo.index(tempo_atual))
+
+new_z_score = st.sidebar.number_input("Gatilho Z-Score (Padrão: 2.0)", value=float(db.get_config("Z_SCORE_LIMIT") or 2.0), step=0.10)
+
+new_amount = st.sidebar.number_input("Exposição por Perna (US$)", value=float(db.get_config("TRADE_AMOUNT_USD") or 6.0), step=1.0)
+new_target = st.sidebar.number_input("Alvo de Lucro (US$)", value=float(db.get_config("TARGET_PNL_USD") or 0.60), step=0.10)
 new_stop = st.sidebar.number_input("Stop Loss (US$)", value=float(db.get_config("STOP_LOSS_USD") or 4.0), step=1.0)
 new_adx = st.sidebar.number_input("Limite Máximo do ADX", value=float(db.get_config("ADX_LIMIT") or 25.0), step=1.0)
 
@@ -51,6 +58,8 @@ if st.sidebar.button("💾 Salvar Parâmetros"):
     st.session_state.sym_b = new_sym_b.upper()
     db.update_config("SYMBOL_A", new_sym_a.upper())
     db.update_config("SYMBOL_B", new_sym_b.upper())
+    db.update_config("TIMEFRAME", new_timeframe)
+    db.update_config("Z_SCORE_LIMIT", str(new_z_score))
     db.update_config("TRADE_AMOUNT_USD", str(new_amount))
     db.update_config("TARGET_PNL_USD", str(new_target))
     db.update_config("STOP_LOSS_USD", str(new_stop))
@@ -68,8 +77,8 @@ with tab1:
     live_status = db.get_config("LIVE_STATUS") or "Aguardando primeira leitura..."
     
     c1, c2, c3 = st.columns(3)
-    c1.metric("Z-Score Atual (Alvo: ±2.50)", z_score)
-    c2.metric("ADX Atual (Limite: < 25)", adx_val)
+    c1.metric("Z-Score Atual", z_score)
+    c2.metric("ADX Atual", adx_val)
     c3.info(f"**Status:** {live_status}")
     
     if st.button("🔄 Atualizar Leitura"):
