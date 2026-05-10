@@ -4,141 +4,192 @@ from config import Config
 from exchange import BinanceExecutor
 from strategy import PairsStrategy
 
-async def main():
-    print("🚀 Iniciando Sistema de Arbitragem Quantitativa (Nível Produção)...")
+async def monitorar_par(executor, pair_idx, symbol_a, symbol_b, amount, target, stop_loss, adx_limit, delay):
+    """Lógica individual ('Tentáculo') para cada par de moedas."""
     
-    # Garante que o banco de dados e as tabelas existam antes de começar
-    db.init_db()
-    
-    # Inicializa a conexão com a Binance e carrega as regras de trading
-    executor = BinanceExecutor(Config.API_KEY, Config.API_SECRET)
-    await executor.connect()
-    
-    print("✅ Conexão com a Binance e regras de mercado carregadas. Entrando no loop...")
+    # 1. DESFASAMENTO CONTRA BANIMENTO DA BINANCE
+    await asyncio.sleep(delay) 
+    print(f"🚀 [Par {pair_idx}] Iniciando monitorização: {symbol_a} x {symbol_b}")
 
-    last_symbol_a = ""
-    last_symbol_b = ""
-    
+    # Configura a alavancagem para este par específico
+    await executor.setup_symbol(symbol_a, Config.LEVERAGE)
+    await executor.setup_symbol(symbol_b, Config.LEVERAGE)
+
     while True:
         try:
             # ---------------------------------------------------------
-            # 1. LEITURA DE PARÂMETROS DO PAINEL (Chamadas Assíncronas)
+            # A. GESTÃO DE SAÍDA (ALVO DE LUCRO OU STOP LOSS)
             # ---------------------------------------------------------
-            bot_status = await db.get_config_async("BOT_STATUS")
-            if bot_status == "OFF":
-                print("💤 Robô pausado pelo Painel. Aguardando...")
-                await asyncio.sleep(5)
-                continue
-            
-            # Puxa os valores atualizados do painel em tempo real
-            # Usando gather para ler configs em paralelo e ganhar milissegundos
-            config_keys = ["SYMBOL_A", "SYMBOL_B", "TRADE_AMOUNT_USD", "TARGET_PNL_USD", "STOP_LOSS_USD", "ADX_LIMIT"]
-            config_vals = await asyncio.gather(*(db.get_config_async(k) for k in config_keys))
-            
-            current_symbol_a = config_vals[0]
-            current_symbol_b = config_vals[1]
-            trade_amount = float(config_vals[2])
-            target_pnl = float(config_vals[3])
-            stop_loss = float(config_vals[4])
-            Config.ADX_LIMIT = float(config_vals[5])
+            is_open, current_pnl, pos_a, pos_b = await executor.get_positions_pnl(symbol_a, symbol_b)
 
-            # --- ATUALIZA O SALDO AO VIVO ---
-            current_balance = await executor.get_usdt_balance()
-            await db.update_config_async("LIVE_BALANCE", f"{current_balance:.2f}")
-
-            # Configura a alavancagem apenas se você trocou de moeda no painel
-            if current_symbol_a != last_symbol_a or current_symbol_b != last_symbol_b:
-                print(f"🔄 Configurando novos ativos: {current_symbol_a} e {current_symbol_b}")
-                await asyncio.gather(
-                    executor.setup_symbol(current_symbol_a, Config.LEVERAGE),
-                    executor.setup_symbol(current_symbol_b, Config.LEVERAGE)
-                )
-                last_symbol_a = current_symbol_a
-                last_symbol_b = current_symbol_b
-
-            # ---------------------------------------------------------
-            # 2. GESTÃO DE SAÍDA (ALVO DE LUCRO OU STOP LOSS)
-            # ---------------------------------------------------------
-            is_open, current_pnl, pos_a, pos_b = await executor.get_positions_pnl(current_symbol_a, current_symbol_b)
-            
             if is_open:
-                print(f"[{current_symbol_a} x {current_symbol_b}] Posição Aberta | PnL Atual: US$ {current_pnl:.4f}")
-                
-                if current_pnl >= target_pnl or current_pnl <= -stop_loss:
-                    motivo = "LUCRO (TARGET)" if current_pnl >= target_pnl else "PREJUÍZO (STOP LOSS)"
-                    print(f"🏁 Fim do Ciclo por {motivo}. Fechando posições a mercado...")
-                    
+                print(f"[{symbol_a} x {symbol_b}] Posição Aberta | PnL Atual: US$ {current_pnl:.4f}")
+
+                if current_pnl >= target or current_pnl <= -stop_loss:
+                    motivo = "LUCRO (TARGET)" if current_pnl >= target else "PREJUÍZO (STOP LOSS)"
+                    print(f"🏁 [Par {pair_idx}] Fim do Ciclo por {motivo}. A fechar posições a mercado...")
+
                     await asyncio.gather(
                         executor.close_position(pos_a),
                         executor.close_position(pos_b)
                     )
-                    
-                    await db.save_trade_async(current_symbol_a, current_symbol_b, current_pnl)
-                    print("✅ Ciclo encerrado e gravado. Aguardando 15s...")
-                    await asyncio.sleep(15) 
+
+                    await db.save_trade_async(symbol_a, symbol_b, current_pnl)
+                    print(f"✅ [Par {pair_idx}] Ciclo encerrado e gravado. A aguardar 15s...")
+                    await asyncio.sleep(15)
                 else:
                     await asyncio.sleep(3)
-                continue 
+                continue # Volta ao início do ciclo se a posição estiver aberta
 
             # ---------------------------------------------------------
-            # 3. LÓGICA DE ENTRADA (PROCURANDO DISTORÇÕES)
+            # B. LÓGICA DE ENTRADA (PROCURANDO DISTORÇÕES)
             # ---------------------------------------------------------
             df_a, df_b = await asyncio.gather(
-                executor.get_klines(current_symbol_a, Config.TIMEFRAME),
-                executor.get_klines(current_symbol_b, Config.TIMEFRAME)
+                executor.get_klines(symbol_a, Config.TIMEFRAME),
+                executor.get_klines(symbol_b, Config.TIMEFRAME)
             )
-            
+
+            # Injeta o limite do ADX dinamicamente para o cálculo
+            Config.ADX_LIMIT = adx_limit
             df_spread = PairsStrategy.calculate_indicators(df_a, df_b, Config)
             signals = PairsStrategy.get_signals(df_spread, Config)
-            
+
             if signals['go_long_spread'] or signals['go_short_spread']:
+                
+                # 2. VERIFICAÇÃO DE MARGEM PRÉ-ORDEM (Impede a Roleta Russa)
+                margem_necessaria = amount * 2
+                saldo_atual = await executor.get_usdt_balance()
+
+                if saldo_atual < margem_necessaria:
+                    print(f"⚠️ [Par {pair_idx}] Sinal em {symbol_a}/{symbol_b}, mas saldo insuficiente (US$ {saldo_atual:.2f}). Ignorando...")
+                    await asyncio.sleep(10)
+                    continue
+
                 side_a = 'BUY' if signals['go_long_spread'] else 'SELL'
                 side_b = 'SELL' if signals['go_long_spread'] else 'BUY'
-                
-                print(f"🚀 DISTORÇÃO IDENTIFICADA! Z-Score: {signals['z_score']:.2f}. Executando orders...")
-                
-                # Execução Atômica (Tentativa)
+
+                print(f"🚀 [Par {pair_idx}] DISTORÇÃO IDENTIFICADA! Z-Score: {signals['z_score']:.2f}. A executar ordens...")
+
+                # Execução Atômica
                 results = await asyncio.gather(
-                    executor.execute_market_order(current_symbol_a, side_a, trade_amount),
-                    executor.execute_market_order(current_symbol_b, side_b, trade_amount),
+                    executor.execute_market_order(symbol_a, side_a, amount),
+                    executor.execute_market_order(symbol_b, side_b, amount),
                     return_exceptions=True
                 )
-                
-                # Verificação de segurança: se uma perna falhou, tentamos fechar a outra imediatamente
-                if any(isinstance(r, Exception) for r in results):
-                    # Verificação de segurança: A temível "Perna Manca"
-                    print("🚨 FALHA CRÍTICA: Perna manca detectada. Abortando operação!")
-                    
-                    # Puxa o status real da Binance no mesmo segundo
-                    _, _, pos_a, pos_b = await executor.get_positions_pnl(current_symbol_a, current_symbol_b)
-                    
-                    # Identifica quem sobreviveu e executa a ordem a mercado para fechar
-                    if not isinstance(results[0], Exception):
-                        print(f"Desfazendo compra/venda de {current_symbol_a}...")
-                        await executor.close_position(pos_a)
 
+                # Defesa contra a "Perna Manca"
+                if any(isinstance(r, Exception) for r in results):
+                    print(f"🚨 [Par {pair_idx}] FALHA CRÍTICA: Perna manca. A abortar operação!")
+                    _, _, pos_a, pos_b = await executor.get_positions_pnl(symbol_a, symbol_b)
+                    if not isinstance(results[0], Exception):
+                        await executor.close_position(pos_a)
                     if not isinstance(results[1], Exception):
-                        print(f"Desfazendo compra/venda de {current_symbol_b}...")
                         await executor.close_position(pos_b)
-                        
-                    print("🛡️ Posição neutralizada com sucesso. Margem salva.")
-                
-                await asyncio.sleep(10) # Pausa para a Binance processar as posições
+                    print(f"🛡️ [Par {pair_idx}] Posição neutralizada com sucesso. Margem salva.")
+
+                await asyncio.sleep(10)
             else:
-                # Envia o "batimento cardíaco" em tempo real para o Painel
-                status_msg = f"Aguardando distorção em {current_symbol_a} e {current_symbol_b}"
-                await db.update_config_async("LIVE_STATUS", status_msg)
-                await db.update_config_async("LIVE_ZSCORE", f"{signals['z_score']:.2f}")
-                await db.update_config_async("LIVE_ADX", f"{signals['adx']:.2f}")
-                
-                print(f"📡 {status_msg} | Z-Score: {signals['z_score']:.2f} | ADX: {signals['adx']:.2f}")
+                # 3. SINCRONISMO COM O PAINEL (Evita o bloqueio do SQLite)
+                # Apenas o primeiro par (Índice 0) envia os dados visuais para o painel Streamlit
+                if pair_idx == 0:
+                    status_msg = f"Aguardando {symbol_a}/{symbol_b} (+{max(0, pair_idx)} par(es))"
+                    await db.update_config_async("LIVE_STATUS", status_msg)
+                    await db.update_config_async("LIVE_ZSCORE", f"{signals['z_score']:.2f}")
+                    await db.update_config_async("LIVE_ADX", f"{signals['adx']:.2f}")
+
+                print(f"📡 [Par {pair_idx}] A monitorizar {symbol_a}/{symbol_b} | Z-Score: {signals['z_score']:.2f} | ADX: {signals['adx']:.2f}")
                 await asyncio.sleep(5)
 
+        except asyncio.CancelledError:
+            # Permite que o robô encerre o par suavemente se houver mudança no painel
+            break
         except Exception as e:
-            print(f"⚠️ Erro no ciclo principal: {e}. Reiniciando em 5s...")
+            print(f"⚠️ Erro no ciclo do Par {pair_idx} ({symbol_a}/{symbol_b}): {e}. Reiniciando em 5s...")
             await asyncio.sleep(5)
 
 
+async def main():
+    print("🚀 A iniciar Sistema de Arbitragem Quantitativa MULTI-PARES (Nível Produção)...")
+    db.init_db()
+
+    executor = BinanceExecutor(Config.API_KEY, Config.API_SECRET)
+    await executor.connect()
+    print("✅ Conexão com a Binance e regras de mercado carregadas.")
+
+    # Memória do Gestor
+    last_lista_a = []
+    last_lista_b = []
+    tarefas_ativas = []
+
+    while True:
+        try:
+            bot_status = await db.get_config_async("BOT_STATUS")
+            
+            # Atualiza o saldo global no painel a cada ciclo
+            current_balance = await executor.get_usdt_balance()
+            await db.update_config_async("LIVE_BALANCE", f"{current_balance:.2f}")
+
+            if bot_status == "OFF":
+                if tarefas_ativas:
+                    print("💤 Robô pausado pelo Painel. A desligar o Polvo...")
+                    for t in tarefas_ativas:
+                        t.cancel()
+                    tarefas_ativas.clear()
+                    last_lista_a = []
+                    last_lista_b = []
+                await asyncio.sleep(5)
+                continue
+
+            # Lê os parâmetros atuais do painel
+            config_keys = ["SYMBOL_A", "SYMBOL_B", "TRADE_AMOUNT_USD", "TARGET_PNL_USD", "STOP_LOSS_USD", "ADX_LIMIT"]
+            config_vals = await asyncio.gather(*(db.get_config_async(k) for k in config_keys))
+
+            str_sym_a = config_vals[0] or ""
+            str_sym_b = config_vals[1] or ""
+            
+            # Converte a string separada por vírgulas numa lista limpa
+            lista_a = [s.strip().upper() for s in str_sym_a.split(",") if s.strip()]
+            lista_b = [s.strip().upper() for s in str_sym_b.split(",") if s.strip()]
+            
+            amount = float(config_vals[2])
+            target = float(config_vals[3])
+            stop = float(config_vals[4])
+            adx_limit = float(config_vals[5])
+
+            # O Gestor deteta se os pares foram alterados no Streamlit
+            if lista_a != last_lista_a or lista_b != last_lista_b:
+                print("🔄 Mudança detetada nos parâmetros. A reconfigurar o Polvo...")
+                
+                # Cancela as tarefas antigas em background
+                for t in tarefas_ativas:
+                    t.cancel()
+                tarefas_ativas.clear()
+
+                if len(lista_a) == len(lista_b) and len(lista_a) > 0:
+                    print(f"🐙 A iniciar MODO MULTI-PARES ({len(lista_a)} pares em simultâneo)...")
+                    
+                    # Cria as novas tarefas com desfasamento de 1.5s
+                    for i in range(len(lista_a)):
+                        delay_inicial = i * 1.5 
+                        tarefa = asyncio.create_task(
+                            monitorar_par(executor, i, lista_a[i], lista_b[i], amount, target, stop, adx_limit, delay_inicial)
+                        )
+                        tarefas_ativas.append(tarefa)
+                    
+                    last_lista_a = lista_a.copy()
+                    last_lista_b = lista_b.copy()
+                else:
+                    print("❌ Erro: O número de ativos A é diferente de B ou a lista está vazia.")
+                    await db.update_config_async("BOT_STATUS", "OFF") # Desliga por segurança
+                    last_lista_a = []
+                    last_lista_b = []
+            
+            # O cérebro central repousa 5s antes de voltar a ler o painel
+            await asyncio.sleep(5)
+
+        except Exception as e:
+            print(f"⚠️ Erro no gestor mestre: {e}")
+            await asyncio.sleep(5)
+
 if __name__ == "__main__":
-    # Inicia o loop assíncrono do Python
     asyncio.run(main())
