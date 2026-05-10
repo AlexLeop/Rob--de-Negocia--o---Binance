@@ -73,7 +73,8 @@ def update_config(key: str, value: str):
     conn = _get_conn()
     try:
         cursor = conn.cursor()
-        cursor.execute('UPDATE config SET value = ? WHERE key = ?', (value, key))
+        # O segredo é o REPLACE: Atualiza se existir, Cria se for nova.
+        cursor.execute('INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)', (key, value))
         conn.commit()
     finally:
         conn.close()

@@ -7,6 +7,14 @@ db.init_db()
 st.set_page_config(page_title="Quant Bot Manager", layout="wide")
 st.title("⚡ Painel de Controle - Arbitragem Estatística")
 
+# --- MEMÓRIA DO PAINEL (Evita que a tabela suma e permite o autopreenchimento) ---
+if "sym_a" not in st.session_state:
+    st.session_state.sym_a = db.get_config("SYMBOL_A") or "ADAUSDT"
+if "sym_b" not in st.session_state:
+    st.session_state.sym_b = db.get_config("SYMBOL_B") or "XRPUSDT"
+if "scan_results" not in st.session_state:
+    st.session_state.scan_results = None
+
 # --- BARRA LATERAL: CONTROLES DO ROBÔ ---
 st.sidebar.header("Engrenagens do Robô")
 
@@ -22,11 +30,19 @@ st.sidebar.markdown(f"**Status Atual:** {'✅ RODANDO' if is_running else '💤 
 st.sidebar.warning("⚠️ Desligue o robô antes de trocar os pares.")
 st.sidebar.divider()
 
+# --- SALDO DA CONTA (Adicionado da última etapa) ---
+current_balance = db.get_config("LIVE_BALANCE") or "0.00"
+st.sidebar.metric("Saldo Binance (Futuros)", f"US$ {current_balance}")
+st.sidebar.divider()
+
 # Ajuste Dinâmico de Parâmetros
 st.sidebar.subheader("Configuração da Operação")
-new_sym_a = st.sidebar.text_input("Ativo A", value=db.get_config("SYMBOL_A") or "SOLUSDT")
-new_sym_b = st.sidebar.text_input("Ativo B", value=db.get_config("SYMBOL_B") or "AVAXUSDT")
-new_amount = st.sidebar.number_input("Exposição (US$)", value=float(db.get_config("TRADE_AMOUNT_USD") or 5.0), step=1.0)
+
+# Usamos a "key" para interligar os campos com a memória de autopreenchimento
+new_sym_a = st.sidebar.text_input("Ativo A", key="sym_a")
+new_sym_b = st.sidebar.text_input("Ativo B", key="sym_b")
+
+new_amount = st.sidebar.number_input("Exposição (US$)", value=float(db.get_config("TRADE_AMOUNT_USD") or 6.0), step=1.0)
 new_target = st.sidebar.number_input("Alvo (US$)", value=float(db.get_config("TARGET_PNL_USD") or 0.60), step=0.10)
 new_stop = st.sidebar.number_input("Stop Loss (US$)", value=float(db.get_config("STOP_LOSS_USD") or 4.0), step=1.0)
 new_adx = st.sidebar.number_input("Limite Máximo do ADX", value=float(db.get_config("ADX_LIMIT") or 25.0), step=1.0)
@@ -47,7 +63,6 @@ with tab1:
     # --- MONITORAMENTO AO VIVO ---
     st.subheader("📡 Radar Ao Vivo do Robô")
     
-    # Lê os dados em tempo real do banco
     z_score = db.get_config("LIVE_ZSCORE") or "0.00"
     adx_val = db.get_config("LIVE_ADX") or "0.00"
     live_status = db.get_config("LIVE_STATUS") or "Aguardando primeira leitura..."
@@ -86,17 +101,40 @@ with tab2:
     
     if st.button("🔍 Iniciar Varredura de Cointegração"):
         with st.spinner("Baixando histórico da Binance e calculando Engle-Granger. Isso pode levar alguns segundos..."):
-            df_scan = scanner.run_market_scan()
+            # Salva o resultado na memória da sessão para não sumir
+            st.session_state.scan_results = scanner.run_market_scan()
             
-            # Estiliza a tabela para facilitar a leitura visual
-            def color_status(val):
-                if '✅' in val: return 'color: green; font-weight: bold'
-                if '⚠️' in val: return 'color: orange'
-                return 'color: red'
-            
-            st.dataframe(
-                df_scan.style.map(color_status, subset=['Status']),
-                use_container_width=True,
-                hide_index=True
-            )
-            st.success("Varredura concluída! Copie o Ativo A e Ativo B ideais e cole no menu lateral para atualizar o robô.")
+    # Se já existir uma varredura salva na memória, renderiza a tabela
+    if st.session_state.scan_results is not None:
+        df_scan = st.session_state.scan_results
+        
+        def color_status(val):
+            if '✅' in val: return 'color: green; font-weight: bold'
+            if '⚠️' in val: return 'color: orange'
+            return 'color: red'
+        
+        st.dataframe(
+            df_scan.style.map(color_status, subset=['Status']),
+            use_container_width=True,
+            hide_index=True
+        )
+        
+        # --- BOTÕES DE AUTOPREENCHIMENTO ---
+        st.markdown("#### ⚡ Seleção Rápida")
+        st.write("Clique em um dos melhores pares abaixo para autopreencher a barra lateral.")
+        
+        # Filtra os 3 melhores pares da tabela
+        df_top = df_scan[df_scan['Status'].str.contains('✅|⚠️')].head(3)
+        
+        if not df_top.empty:
+            cols = st.columns(len(df_top))
+            for idx, row in enumerate(df_top.to_dict('records')):
+                with cols[idx]:
+                    btn_label = f"Carregar {row['Ativo A']} x {row['Ativo B']}"
+                    # Ao clicar, atualiza a memória e recarrega a barra lateral
+                    if st.button(btn_label, use_container_width=True):
+                        st.session_state.sym_a = row['Ativo A']
+                        st.session_state.sym_b = row['Ativo B']
+                        st.rerun()
+        else:
+            st.info("Nenhum par com status aceitável no momento.")

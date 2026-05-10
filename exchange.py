@@ -122,3 +122,13 @@ class BinanceExecutor:
             print(f"🏁 [{symbol}] Posição ZERADA ({side} {abs_qty}).")
         except Exception as e:
             print(f"🚨 Erro ao fechar posição em {symbol}: {e}")
+
+async def get_usdt_balance(self) -> float:
+        try:
+            balances = await self.client.futures_account_balance()
+            for b in balances:
+                if b['asset'] == 'USDT':
+                    return float(b['balance'])
+        except Exception as e:
+            print(f"Erro ao buscar saldo: {e}")
+        return 0.0

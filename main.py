@@ -42,6 +42,10 @@ async def main():
             stop_loss = float(config_vals[4])
             Config.ADX_LIMIT = float(config_vals[5])
 
+            # --- ATUALIZA O SALDO AO VIVO ---
+            current_balance = await executor.get_usdt_balance()
+            await db.update_config_async("LIVE_BALANCE", f"{current_balance:.2f}")
+
             # Configura a alavancagem apenas se você trocou de moeda no painel
             if current_symbol_a != last_symbol_a or current_symbol_b != last_symbol_b:
                 print(f"🔄 Configurando novos ativos: {current_symbol_a} e {current_symbol_b}")
