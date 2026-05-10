@@ -60,8 +60,9 @@ async def monitorar_par(executor, pair_idx, symbol_a, symbol_b, amount, target, 
                     await asyncio.sleep(10)
                     continue
 
-                side_a = 'BUY' if signals['z_score'] > 0 else 'SELL'
-                side_b = 'SELL' if signals['z_score'] > 0 else 'BUY'
+                # Se o Z-Score é positivo, Ativo A está caro (Vende A, Compra B)
+                side_a = 'SELL' if signals['z_score'] > 0 else 'BUY'
+                side_b = 'BUY' if signals['z_score'] > 0 else 'SELL'
 
                 print(f"🚀 [Par {pair_idx}] DISTORÇÃO IDENTIFICADA! Z-Score: {signals['z_score']:.2f}. A executar ordens...")
 
