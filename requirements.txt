@@ -1,6 +1,7 @@
 python-binance==1.0.19
 pandas==2.2.1
-pandas-ta
+numpy<2.0.0
+pandas-ta==0.3.14b0
 python-dotenv==1.0.1
 streamlit==1.32.2
 statsmodels==0.14.1
