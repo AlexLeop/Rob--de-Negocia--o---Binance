@@ -4,3 +4,4 @@ pandas-ta
 python-dotenv==1.0.1
 streamlit==1.32.2
 statsmodels>=0.14.2
+numpy>=2.2.6
