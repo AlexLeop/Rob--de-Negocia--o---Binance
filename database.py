@@ -7,7 +7,7 @@ import os
 # MUDANÇA CRÍTICA 1: Caminho Absoluto
 # Isso garante que tanto o Painel quanto o Robô leiam exatamente o mesmo ficheiro físico no servidor.
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.path.join(BASE_DIR, "bot_data.db")
+DB_PATH = "/app/data/bot_data.db"
 
 def _get_conn():
     """Retorna uma conexão com modo WAL habilitado para suportar concorrência."""
