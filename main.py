@@ -1,7 +1,7 @@
 import asyncio
 import database as db
 from config import Config
-from exchange import BybitExecutor
+from exchange import BinanceExecutor
 from strategy import PairsStrategy
 
 async def main():
@@ -10,11 +10,11 @@ async def main():
     # Garante que o banco de dados e as tabelas existam antes de começar
     db.init_db()
     
-    # Inicializa a conexão com a Bybit e carrega as regras de trading
-    executor = BybitExecutor(Config.API_KEY, Config.API_SECRET)
+    # Inicializa a conexão com a Binance e carrega as regras de trading
+    executor = BinanceExecutor(Config.API_KEY, Config.API_SECRET)
     await executor.connect()
     
-    print("✅ Conexão com a Bybit e regras de mercado carregadas. Entrando no loop...")
+    print("✅ Conexão com a Binance e regras de mercado carregadas. Entrando no loop...")
 
     last_symbol_a = ""
     last_symbol_b = ""
