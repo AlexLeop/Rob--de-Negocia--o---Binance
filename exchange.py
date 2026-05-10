@@ -86,7 +86,7 @@ class BinanceExecutor:
             
             if final_qty <= 0:
                 print(f"❌ Erro: Quantidade calculada para {symbol} é zero (Abaixo do mínimo).")
-                return None
+                raise ValueError(f"Quantidade abaixo do lote mínimo para {symbol}")
 
             order = await self.client.futures_create_order(
                 symbol=symbol,
