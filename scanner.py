@@ -3,7 +3,6 @@ import pandas as pd
 from statsmodels.tsa.stattools import coint
 import time
 
-# Lista atualizada com os novos tickers da Binance
 PAIRS_TO_TEST = [
     ("BTCUSDT", "ETHUSDT"), ("SOLUSDT", "AVAXUSDT"), ("ADAUSDT", "DOTUSDT"),
     ("NEARUSDT", "ATOMUSDT"), ("APTUSDT", "SUIUSDT"), ("OPUSDT", "ARBUSDT"),
@@ -18,7 +17,6 @@ def get_binance_data(symbol, interval="1h", limit=500):
         response = requests.get(url)
         data = response.json()
         
-        # Trava: Se a Binance retornar um erro (ex: Invalid Symbol), aborta.
         if isinstance(data, dict) and 'msg' in data:
             return None
             
@@ -42,12 +40,20 @@ def run_market_scan():
             
         df = df_a.join(df_b, lsuffix='_A', rsuffix='_B').dropna()
         
-        # 🚨 NOVA TRAVA DE SEGURANÇA: Garante que sobraram dados suficientes para a matemática
         if df.empty or len(df) < 30:
-            print(f"Dados insuficientes para parear {asset_a} e {asset_b}. Pulando...")
             continue
             
-        score, p_value, _ = coint(df['close_A'], df['close_B'])
+        # 🚨 BLINDAGEM 1: Se o preço não oscilou (x is constant), pula o par.
+        if df['close_A'].nunique() <= 1 or df['close_B'].nunique() <= 1:
+            print(f"⚠️ Preço congelado detectado em {asset_a} ou {asset_b}. Pulando...")
+            continue
+            
+        # 🚨 BLINDAGEM 2: Captura qualquer erro matemático (ex: matriz singular) para não quebrar o painel
+        try:
+            score, p_value, _ = coint(df['close_A'], df['close_B'])
+        except Exception as e:
+            print(f"⚠️ Erro matemático ao calcular {asset_a} x {asset_b}: {e}. Pulando...")
+            continue
         
         status = "✅ Excelente" if p_value < 0.01 else "⚠️ Aceitável" if p_value < 0.05 else "❌ Descartar"
         
