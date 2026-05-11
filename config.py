@@ -21,3 +21,4 @@ class Config:
     
     TARGET_PNL = float(os.getenv("TARGET_PNL_USD", 0.50))
     STOP_LOSS = float(os.getenv("STOP_LOSS_USD", 15.00))
+    GLOBAL_STOP_LOSS_PCT = float(os.getenv("GLOBAL_STOP_LOSS_PCT", 20.0))
