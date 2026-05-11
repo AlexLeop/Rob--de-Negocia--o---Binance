@@ -26,6 +26,11 @@ class PairsStrategy:
 
     @staticmethod
     def calculate_indicators(df_a, df_b, config):
+        # --- NOVA VACINA: Alinhamento de Índices (Evita erros do Statsmodels) ---
+        common_index = df_a.index.intersection(df_b.index)
+        df_a = df_a.loc[common_index]
+        df_b = df_b.loc[common_index]
+        
         df = pd.DataFrame(index=df_a.index)
         
         # 1. Transformação Logarítmica (Achata a volatilidade extrema)
