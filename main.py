@@ -98,6 +98,14 @@ async def monitorar_par(executor, pair_idx, symbol_a, symbol_b, amount, target, 
                     amount_a = amount
                     amount_b = amount * abs(beta_dinamico)
 
+                    # --- TRAVA ANTI-SANGRAMENTO (Mínimo da Binance) ---
+                    # A Binance rejeita ordens < 5.00 USDT. Usamos 5.50 para margem de segurança.
+                    if amount_a < 5.5 or amount_b < 5.5:
+                        print(f"⚠️ [Par {pair_idx}] Abortado: Lote (A: {amount_a:.2f} | B: {amount_b:.2f}) abaixo do limite da corretora. Beta extremo: {beta_dinamico:.2f}")
+                        consecutive_triggers = 0
+                        await asyncio.sleep(20)
+                        continue
+
                     # --- CORREÇÃO DO DIRETOR: MARGEM REAL ---
                     margem_real_necessaria = (amount_a + amount_b) / Config.LEVERAGE
                     saldo_atual = await executor.get_usdt_balance()
