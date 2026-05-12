@@ -95,13 +95,27 @@ async def monitorar_par(executor, pair_idx, symbol_a, symbol_b, amount, target, 
 
                 if consecutive_triggers >= 3:
                     # APLICAÇÃO DO BETA (Exposição Delta Neutral)
-                    amount_a = amount
-                    amount_b = amount * abs(beta_dinamico)
+                    amount_a_base = amount
+                    amount_b_base = amount * abs(beta_dinamico)
 
-                    # --- TRAVA ANTI-SANGRAMENTO (Mínimo da Binance) ---
-                    # A Binance rejeita ordens < 5.00 USDT. Usamos 5.50 para margem de segurança.
-                    if amount_a < 5.5 or amount_b < 5.5:
-                        print(f"⚠️ [Par {pair_idx}] Abortado: Lote (A: {amount_a:.2f} | B: {amount_b:.2f}) abaixo do limite da corretora. Beta extremo: {beta_dinamico:.2f}")
+                    # --- NOVA SOLUÇÃO: AUTO-ESCALA PROPORCIONAL ---
+                    # Se uma das pernas for menor que 5.5, calculamos um fator de escala 
+                    # para puxar a perna mais fraca para o mínimo exigido e subimos a outra na mesma proporção.
+                    min_leg = min(amount_a_base, amount_b_base)
+                    
+                    if min_leg < 5.5:
+                        fator_escala = 5.5 / min_leg
+                        amount_a = amount_a_base * fator_escala
+                        amount_b = amount_b_base * fator_escala
+                        print(f"⚖️ [Par {pair_idx}] Auto-Escala ativada (Fator: {fator_escala:.2f}). Novos Lotes -> A: {amount_a:.2f} | B: {amount_b:.2f}")
+                    else:
+                        amount_a = amount_a_base
+                        amount_b = amount_b_base
+
+                    # --- LIMITADOR DE ANOMALIA EXTREMA ---
+                    # Se o Beta for tão distorcido que a Perna Maior passe de US$ 80 de nocional, aí sim abortamos.
+                    if amount_a > 80.0 or amount_b > 80.0:
+                        print(f"⚠️ [Par {pair_idx}] Abortado: Beta extremo exigiu um lote perigosamente alto (A: {amount_a:.2f} | B: {amount_b:.2f}).")
                         consecutive_triggers = 0
                         await asyncio.sleep(20)
                         continue
