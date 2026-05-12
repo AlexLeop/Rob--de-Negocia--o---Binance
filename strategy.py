@@ -17,25 +17,29 @@ class PairsStrategy:
         model = sm.OLS(spread_ret, spread_lag2)
         res = model.fit()
         
-        # Prevenção contra divisão por zero ou não-reversão
+        # Prevenção contra divisão por zero ou se a série não for estacionária
         if res.params.iloc[1] >= 0:
-            return 999 
+            return 999.0 
             
         halflife = -np.log(2) / res.params.iloc[1]
         return halflife
 
     @staticmethod
     def calculate_indicators(df_a, df_b, config):
-        # --- NOVA VACINA: Alinhamento de Índices (Evita erros do Statsmodels) ---
-        common_index = df_a.index.intersection(df_b.index)
-        df_a = df_a.loc[common_index]
-        df_b = df_b.loc[common_index]
+        # --- VACINA ANTI-ERRO: Alinhamento Perfeito de Índices ---
+        # Cria um DataFrame temporário que une apenas os minutos onde AMBAS as moedas existem
+        df_temp = pd.DataFrame({
+            'close_a': df_a['close'],
+            'close_b': df_b['close'],
+            'high_a': df_a['high'],
+            'low_a': df_a['low']
+        }).dropna()
         
-        df = pd.DataFrame(index=df_a.index)
+        df = pd.DataFrame(index=df_temp.index)
         
-        # 1. Transformação Logarítmica (Achata a volatilidade extrema)
-        log_a = np.log(df_a['close'])
-        log_b = np.log(df_b['close'])
+        # 1. Transformação Logarítmica
+        log_a = np.log(df_temp['close_a'])
+        log_b = np.log(df_temp['close_b'])
         
         # 2. Cálculo do Beta Dinâmico (Hedge Ratio) via OLS
         x = sm.add_constant(log_b)
@@ -55,14 +59,15 @@ class PairsStrategy:
         df['half_life'] = hl
         
         # 6. ADX (Filtro de Tendência)
-        adx_a = ta.adx(df_a['high'], df_a['low'], df_a['close'], length=14)
+        adx_a = ta.adx(df_temp['high_a'], df_temp['low_a'], df_temp['close_a'], length=14)
         df['adx'] = adx_a['ADX_14'] if adx_a is not None else 0
 
-        return df, beta # Agora a estratégia devolve o Beta para o main.py
+        return df, beta
 
     @staticmethod
     def get_signals(df, config):
-        last_row = df.iloc[-1] # Lendo a vela atual para não ter atraso
+        # Lendo a vela atual (iloc[-1]) para reagir em tempo real
+        last_row = df.iloc[-1] 
         return {
             'z_score': last_row['z_score'],
             'adx': last_row['adx'],
