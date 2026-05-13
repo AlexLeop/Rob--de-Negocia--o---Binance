@@ -186,6 +186,13 @@ async def main():
             lb = [s.strip().upper() for s in str_b.split(",") if s.strip()]
             
             if la != last_a or lb != last_b:
+                # BUG-PREVENÇÃO: Verificação de Sobreposição de Ativos
+                # Evita que o mesmo ativo seja usado em pares diferentes, o que contaminaria o PnL
+                all_assets = la + lb
+                if len(all_assets) != len(set(all_assets)):
+                    print("🚨 [Erro] Sobreposição de ativos detectada! Cada par deve ter ativos únicos para evitar contaminação de PnL.")
+                    await asyncio.sleep(10); continue
+
                 for t in tarefas: t.cancel()
                 tarefas = []
                 if len(la) == len(lb) > 0:

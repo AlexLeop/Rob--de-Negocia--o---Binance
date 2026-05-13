@@ -26,19 +26,30 @@ class PairsStrategy:
     @staticmethod
     def calculate_indicators(df_a, df_b, config):
         # Alinhamento Perfeito de Índices (Vacina anti-erro de matriz)
-        # Sincronização estrita por timestamp
         common_index = df_a.index.intersection(df_b.index)
         if len(common_index) < 30:
             return None, 1.0
 
-        df_temp = pd.DataFrame({
-            'close_a': df_a.loc[common_index, 'close'],
-            'close_b': df_b.loc[common_index, 'close'],
-            'high_a': df_a.loc[common_index, 'high'],
-            'low_a': df_a.loc[common_index, 'low'],
-            'high_b': df_b.loc[common_index, 'high'],
-            'low_b': df_b.loc[common_index, 'low']
-        }).sort_index()
+        # Sincronização estrita por timestamp
+        # Reindexa para garantir que não existam lacunas (missing candles) que quebrem a série temporal
+        # O freq é inferido ou assume-se o padrão da sessão
+        try:
+            freq = pd.infer_freq(common_index) or '5min'
+            full_index = pd.date_range(start=common_index.min(), end=common_index.max(), freq=freq)
+        except:
+            full_index = common_index
+
+        df_temp = pd.DataFrame(index=full_index)
+        df_temp['close_a'] = df_a['close'].reindex(full_index).ffill()
+        df_temp['close_b'] = df_b['close'].reindex(full_index).ffill()
+        df_temp['high_a'] = df_a['high'].reindex(full_index).ffill()
+        df_temp['low_a'] = df_a['low'].reindex(full_index).ffill()
+        df_temp['high_b'] = df_b['high'].reindex(full_index).ffill()
+        df_temp['low_b'] = df_b['low'].reindex(full_index).ffill()
+        
+        df_temp = df_temp.dropna() 
+        if len(df_temp) < 30:
+            return None, 1.0
         
         log_a = np.log(df_temp['close_a'])
         log_b = np.log(df_temp['close_b'])

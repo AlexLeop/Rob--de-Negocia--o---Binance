@@ -1,5 +1,6 @@
 import math
 import asyncio
+import time
 from binance.client import AsyncClient
 from binance.exceptions import BinanceAPIException
 import pandas as pd
@@ -10,20 +11,36 @@ class BinanceExecutor:
         self.api_secret = api_secret
         self.client = None
         self.rules = {}
+        self._pos_cache = None
+        self._last_pos_time = 0
+        self._last_rules_time = 0
 
     async def connect(self):
         self.client = await AsyncClient.create(self.api_key, self.api_secret)
-        info = await self.client.futures_exchange_info()
-        for s in info['symbols']:
-            lot_filter = next((f for f in s['filters'] if f['filterType'] == 'LOT_SIZE'), None)
-            notional_filter = next((f for f in s['filters'] if f['filterType'] == 'MIN_NOTIONAL'), None)
-            self.rules[s['symbol']] = {
-                'stepSize': float(lot_filter['stepSize']) if lot_filter else 1.0,
-                'minNotional': float(notional_filter['notional']) if notional_filter else 5.0
-            }
+        await self.refresh_exchange_info()
+
+    async def refresh_exchange_info(self):
+        """Atualiza filtros de lote e nocional (Executado a cada 1h)."""
+        now = time.time()
+        if now - self._last_rules_time < 3600: return # Cache de 1h
+        
+        try:
+            info = await self.client.futures_exchange_info()
+            for s in info['symbols']:
+                lot_filter = next((f for f in s['filters'] if f['filterType'] == 'LOT_SIZE'), None)
+                notional_filter = next((f for f in s['filters'] if f['filterType'] == 'MIN_NOTIONAL'), None)
+                self.rules[s['symbol']] = {
+                    'stepSize': float(lot_filter['stepSize']) if lot_filter else 1.0,
+                    'minNotional': float(notional_filter['notional']) if notional_filter else 5.0
+                }
+            self._last_rules_time = now
+            print("🔄 [Exchange] Filtros de negociação atualizados.")
+        except Exception as e:
+            print(f"⚠️ Erro ao atualizar regras: {e}")
 
     async def validate_pair_pre_flight(self, sym_a, amt_a, sym_b, amt_b):
         """Impede o disparo se o par for financeiramente inviável."""
+        await self.refresh_exchange_info() # Garante regras frescas
         from config import Config
         rules_a = self.rules.get(sym_a)
         rules_b = self.rules.get(sym_b)
@@ -96,9 +113,14 @@ class BinanceExecutor:
         return df[['close', 'high', 'low']].astype(float)
 
     async def get_positions_pnl(self, symbol_a: str, symbol_b: str):
-        positions = await self.client.futures_position_information()
-        pos_a = next((p for p in positions if p['symbol'] == symbol_a), None)
-        pos_b = next((p for p in positions if p['symbol'] == symbol_b), None)
+        """Obtém PnL das posições com cache de 2s para evitar spam de API."""
+        now = time.time()
+        if not self._pos_cache or (now - self._last_pos_time > 2):
+            self._pos_cache = await self.client.futures_position_information()
+            self._last_pos_time = now
+            
+        pos_a = next((p for p in self._pos_cache if p['symbol'] == symbol_a), None)
+        pos_b = next((p for p in self._pos_cache if p['symbol'] == symbol_b), None)
         
         amt_a = float(pos_a['positionAmt']) if pos_a else 0.0
         amt_b = float(pos_b['positionAmt']) if pos_b else 0.0
