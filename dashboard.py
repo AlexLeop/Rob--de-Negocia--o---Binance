@@ -24,60 +24,92 @@ st.markdown("""
     }
     
     .main {
-        background-color: #0b0e14;
+        background-color: #0d1117;
+        color: #c9d1d9;
     }
     
     /* Metrics Styling */
     div[data-testid="stMetric"] {
         background-color: #161b22;
         border: 1px solid #30363d;
-        border-radius: 8px;
-        padding: 15px 20px;
+        border-radius: 6px;
+        padding: 10px 15px;
+        transition: transform 0.2s ease;
+    }
+    div[data-testid="stMetric"]:hover {
+        border-color: #58a6ff;
+    }
+    div[data-testid="stMetricValue"] > div {
+        color: #f0f6fc !important;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 1.8rem !important;
+    }
+    div[data-testid="stMetricLabel"] > div {
+        color: #8b949e !important;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        font-size: 0.75rem !important;
+    }
+    
+    /* Sidebar Metric */
+    section[data-testid="stSidebar"] div[data-testid="stMetricValue"] > div {
+        font-size: 1.2rem !important;
+        white-space: normal !important;
+    }
+
+    /* Input Fields */
+    .stTextInput>div>div>input, .stNumberInput>div>div>input, .stSelectbox>div>div>div {
+        background-color: #0d1117 !important;
+        color: #c9d1d9 !important;
+        border: 1px solid #30363d !important;
     }
     
     /* Buttons */
     .stButton>button {
         text-transform: uppercase;
-        font-weight: 700;
-        letter-spacing: 0.5px;
+        font-weight: 600;
+        letter-spacing: 1px;
         border-radius: 4px;
-        transition: all 0.2s ease;
+        font-size: 0.8rem;
+        border: 1px solid #30363d;
     }
     
     /* Tabs */
     .stTabs [data-baseweb="tab-list"] {
-        gap: 24px;
+        gap: 8px;
         background-color: transparent;
+        border-bottom: 1px solid #30363d;
     }
     
     .stTabs [data-baseweb="tab"] {
-        height: 50px;
-        padding-top: 10px;
-        font-weight: 600;
+        height: 40px;
+        padding: 0 16px;
+        font-weight: 500;
         color: #8b949e;
+        border: none;
     }
     
     .stTabs [aria-selected="true"] {
         color: #58a6ff !important;
-        border-bottom-color: #58a6ff !important;
+        background-color: #161b22 !important;
+        border-radius: 4px 4px 0 0;
     }
 
-    /* Sidebar */
-    section[data-testid="stSidebar"] {
-        background-color: #0d1117;
-        border-right: 1px solid #30363d;
+    /* Section Headers */
+    h1, h2, h3 {
+        color: #f0f6fc !important;
+        font-weight: 600 !important;
+        border-bottom: none !important;
     }
     
-    .status-indicator {
-        display: inline-block;
-        width: 10px;
-        height: 10px;
-        border-radius: 50%;
-        margin-right: 8px;
+    .status-container {
+        display: flex;
+        align-items: center;
+        background-color: #161b22;
+        padding: 10px 15px;
+        border-radius: 6px;
+        border: 1px solid #30363d;
     }
-    
-    .status-online { background-color: #238636; box-shadow: 0 0 10px #238636; }
-    .status-offline { background-color: #da3633; }
     
     </style>
     """, unsafe_allow_html=True)
@@ -153,25 +185,39 @@ if st.sidebar.button("SALVAR ALTERAÇÕES", use_container_width=True):
 tab_monitor, tab_scanner, tab_history = st.tabs(["MONITORAMENTO", "SCANNER DE MERCADO", "HISTÓRICO OPERACIONAL"])
 
 with tab_monitor:
-    # Live Status
-    st.markdown("### STATUS OPERACIONAL")
+    # Status Operacional e Conexão
+    st.markdown("### MONITORAMENTO")
     live_z = db.get_config("LIVE_ZSCORE") or "0.00"
     live_adx = db.get_config("LIVE_ADX") or "0.00"
     live_status = db.get_config("LIVE_STATUS") or "Iniciando monitoramento..."
     
-    m1, m2, m3 = st.columns(3)
+    col_metrics, col_conn = st.columns([3, 1])
     
-    z_val = float(live_z)
-    z_color = "normal"
-    if abs(z_val) > new_z_limit: z_color = "inverse"
+    with col_metrics:
+        m1, m2 = st.columns(2)
+        z_val = float(live_z)
+        z_color = "normal"
+        if abs(z_val) > new_z_limit: z_color = "inverse"
+        m1.metric("Z-SCORE ATUAL", live_z, delta_color=z_color)
+        m2.metric("ADX (AGREGADO)", live_adx)
     
-    m1.metric("Z-SCORE ATUAL", live_z, delta_color=z_color)
-    m2.metric("ADX (AGREGADO)", live_adx)
+    with col_conn:
+        status_online = "background-color: #238636; box-shadow: 0 0 10px #238636;"
+        status_offline = "background-color: #da3633;"
+        current_style = status_online if is_running else status_offline
+        
+        st.markdown(f"""
+            <div class="status-container">
+                <div style="width: 10px; height: 10px; border-radius: 50%; margin-right: 12px; {current_style}"></div>
+                <div>
+                    <div style="font-size: 0.7rem; color: #8b949e; letter-spacing: 1px;">CORE ENGINE</div>
+                    <div style="font-size: 0.9rem; font-weight: 600; color: #f0f6fc;">{'CONECTADO' if is_running else 'DESCONECTADO'}</div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
     
-    status_html = f'<div class="status-indicator {"status-online" if is_running else "status-offline"}"></div>'
-    m3.markdown(f"**CONEXÃO COM CORE**<br>{status_html} {'ATIVO' if is_running else 'DESCONECTADO'}", unsafe_allow_html=True)
-    
-    st.code(f"EVENT_LOG: {live_status}", language="bash")
+    st.markdown("#### LOG DE EVENTOS")
+    st.code(f"{live_status}", language="bash")
     
     st.divider()
     
