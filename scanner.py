@@ -52,12 +52,13 @@ def get_binance_data(symbol, interval="1h", limit=500):
     except Exception:
         return None
 
-def run_market_scan():
+def run_market_scan(interval="5m", limit=200):
     results = []
+    print(f"🔍 Iniciando Scan em {interval} (Limite: {limit} candles)...")
     for asset_a, asset_b in PAIRS_TO_TEST:
-        df_a = get_binance_data(asset_a)
+        df_a = get_binance_data(asset_a, interval=interval, limit=limit)
         time.sleep(0.3)
-        df_b = get_binance_data(asset_b)
+        df_b = get_binance_data(asset_b, interval=interval, limit=limit)
         time.sleep(0.3)
         
         if df_a is None or df_b is None or df_a.empty or df_b.empty:

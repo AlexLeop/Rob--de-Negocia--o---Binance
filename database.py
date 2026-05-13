@@ -1,6 +1,7 @@
 import sqlite3
 import pandas as pd
 import asyncio
+import time
 from datetime import datetime
 import os
 
@@ -14,9 +15,17 @@ else:
 
 def _get_conn():
     """Retorna uma conexão com modo WAL habilitado para suportar concorrência."""
-    conn = sqlite3.connect(DB_PATH, timeout=10)
-    conn.execute("PRAGMA journal_mode=WAL;")
-    return conn
+    # Timeout de 10s e retries manuais para robustez extrema
+    for i in range(5):
+        try:
+            conn = sqlite3.connect(DB_PATH, timeout=10)
+            conn.execute("PRAGMA journal_mode=WAL;")
+            return conn
+        except sqlite3.OperationalError as e:
+            if "locked" in str(e).lower() and i < 4:
+                time.sleep(0.2)
+                continue
+            raise e
 
 def init_db():
     conn = _get_conn()

@@ -24,6 +24,7 @@ class BinanceExecutor:
 
     async def validate_pair_pre_flight(self, sym_a, amt_a, sym_b, amt_b):
         """Impede o disparo se o par for financeiramente inviável."""
+        from config import Config
         rules_a = self.rules.get(sym_a)
         rules_b = self.rules.get(sym_b)
         if not rules_a or not rules_b: return False, "Erro nas regras de API"
@@ -32,7 +33,8 @@ class BinanceExecutor:
             m = max(rules_a['minNotional'], rules_b['minNotional'])
             return False, f"Nocional abaixo do mín (Exige: {m})"
             
-        total_needed = (amt_a + amt_b) / 10 
+        # BUG-05: Leverage Dinâmico (Removido hardcoded /10)
+        total_needed = (amt_a + amt_b) / Config.LEVERAGE 
         balance = await self.get_usdt_balance()
         if balance < (total_needed * 1.15): # 15% de margem de segurança
             return False, "Saldo insuficiente para margem do par"
@@ -40,7 +42,7 @@ class BinanceExecutor:
         return True, "OK"
 
     async def execute_market_order(self, symbol: str, side: str, qty_usd: float):
-        """Executa ordem a mercado com arredondamento estrito de lote."""
+        """Executa ordem a mercado e retorna detalhes do preenchimento."""
         try:
             ticker = await self.client.futures_symbol_ticker(symbol=symbol)
             price = float(ticker['price'])
@@ -53,9 +55,19 @@ class BinanceExecutor:
             
             if final_qty <= 0: return None
 
-            return await self.client.futures_create_order(
+            order = await self.client.futures_create_order(
                 symbol=symbol, side=side.upper(), type='MARKET', quantity=final_qty
             )
+            
+            # Extrai dados reais do preenchimento
+            fill_qty = float(order.get('executedQty', final_qty))
+            fill_price = float(order.get('avgPrice', price))
+            return {
+                'symbol': symbol,
+                'qty': fill_qty,
+                'price': fill_price,
+                'notional': fill_qty * fill_price
+            }
         except Exception as e:
             print(f"❌ Erro de execução em {symbol}: {e}")
             return None

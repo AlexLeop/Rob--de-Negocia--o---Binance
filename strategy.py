@@ -26,37 +26,65 @@ class PairsStrategy:
     @staticmethod
     def calculate_indicators(df_a, df_b, config):
         # Alinhamento Perfeito de Índices (Vacina anti-erro de matriz)
+        # Sincronização estrita por timestamp
+        common_index = df_a.index.intersection(df_b.index)
+        if len(common_index) < 30:
+            return None, 1.0
+
         df_temp = pd.DataFrame({
-            'close_a': df_a['close'],
-            'close_b': df_b['close'],
-            'high_a': df_a['high'],
-            'low_a': df_a['low']
-        }).dropna()
+            'close_a': df_a.loc[common_index, 'close'],
+            'close_b': df_b.loc[common_index, 'close'],
+            'high_a': df_a.loc[common_index, 'high'],
+            'low_a': df_a.loc[common_index, 'low'],
+            'high_b': df_b.loc[common_index, 'high'],
+            'low_b': df_b.loc[common_index, 'low']
+        }).sort_index()
         
-        df = pd.DataFrame(index=df_temp.index)
         log_a = np.log(df_temp['close_a'])
         log_b = np.log(df_temp['close_b'])
         
-        # OLS para Beta Dinâmico
-        x = sm.add_constant(log_b)
-        model = sm.OLS(log_a, x).fit()
-        beta = model.params.iloc[1]
+        # BUG-04: Rolling OLS para Beta Dinâmico (Sintonizado com Z_WINDOW)
+        betas = []
+        for i in range(len(log_a)):
+            if i < config.Z_WINDOW:
+                betas.append(np.nan)
+                continue
+            # Janela deslizante para o cálculo do Beta
+            window_b = sm.add_constant(log_b.iloc[i-config.Z_WINDOW:i])
+            window_a = log_a.iloc[i-config.Z_WINDOW:i]
+            try:
+                model = sm.OLS(window_a, window_b).fit()
+                betas.append(model.params.iloc[1])
+            except:
+                betas.append(betas[-1] if betas else 1.0)
         
-        df['spread'] = log_a - (beta * log_b)
+        df = pd.DataFrame(index=df_temp.index)
+        df['beta'] = betas
+        df['spread'] = log_a - (df['beta'] * log_b)
+        
         mean = df['spread'].rolling(window=config.Z_WINDOW).mean()
         std = df['spread'].rolling(window=config.Z_WINDOW).std()
         df['z_score'] = (df['spread'] - mean) / std
         
-        df['half_life'] = PairsStrategy.calculate_half_life(df['spread'].dropna())
+        # BUG-12: Half-life como valor escalar único (último calculado)
+        hl_series = df['spread'].dropna()
+        latest_hl = PairsStrategy.calculate_half_life(hl_series) if len(hl_series) > 30 else 999.0
+        df['half_life'] = latest_hl
         
-        # --- FILTRO CRÍTICO: Correlação de Pearson ---
-        # Evita entrar em pares que "se divorciaram" momentaneamente
-        df['correlation'] = df_temp['close_a'].rolling(window=config.Z_WINDOW).corr(df_temp['close_b'])
+        # BUG-10: Correlação de Pearson em Log-Retornos (Estatisticamente correto)
+        ret_a = log_a.diff()
+        ret_b = log_b.diff()
+        df['correlation'] = ret_a.rolling(window=config.Z_WINDOW).corr(ret_b)
         
-        adx_a = ta.adx(df_temp['high_a'], df_temp['low_a'], df_temp['close_a'], length=14)
-        df['adx'] = adx_a['ADX_14'] if adx_a is not None else 0
+        # BUG-09: ADX Combinado (Máximo entre Ativo A e B)
+        adx_a = ta.adx(df_temp['high_a'], df_temp['low_a'], df_temp['close_a'], length=config.ADX_PERIOD)
+        adx_b = ta.adx(df_temp['high_b'], df_temp['low_b'], df_temp['close_b'], length=config.ADX_PERIOD)
+        
+        val_a = adx_a['ADX_14'] if adx_a is not None else pd.Series(0, index=df.index)
+        val_b = adx_b['ADX_14'] if adx_b is not None else pd.Series(0, index=df.index)
+        df['adx'] = np.maximum(val_a, val_b)
 
-        return df, beta
+        return df, df['beta'].iloc[-1]
 
     @staticmethod
     def get_signals(df, config):

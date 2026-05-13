@@ -46,11 +46,11 @@ opcoes_tempo = ["1m", "3m", "5m", "15m", "1h"]
 tempo_atual = db.get_config("TIMEFRAME") or "5m"
 new_timeframe = st.sidebar.selectbox("Tempo Gráfico", opcoes_tempo, index=opcoes_tempo.index(tempo_atual))
 
-new_z_score = st.sidebar.number_input("Gatilho Z-Score (Padrão: 2.0)", value=float(db.get_config("Z_SCORE_LIMIT") or 2.0), step=0.10)
+new_z_score = st.sidebar.number_input("Gatilho Z-Score (Padrão: 2.5)", value=float(db.get_config("Z_SCORE_LIMIT") or 2.5), step=0.10)
 
 new_amount = st.sidebar.number_input("Exposição por Perna (US$)", value=float(db.get_config("TRADE_AMOUNT_USD") or 6.0), step=1.0)
-new_target = st.sidebar.number_input("Alvo de Lucro (US$)", value=float(db.get_config("TARGET_PNL_USD") or 0.60), step=0.10)
-new_stop = st.sidebar.number_input("Stop Loss (US$)", value=float(db.get_config("STOP_LOSS_USD") or 4.0), step=1.0)
+new_target = st.sidebar.number_input("Alvo de Lucro (US$)", value=float(db.get_config("TARGET_PNL_USD") or 0.25), step=0.10)
+new_stop = st.sidebar.number_input("Stop Loss (US$)", value=float(db.get_config("STOP_LOSS_USD") or 1.50), step=1.0)
 new_adx = st.sidebar.number_input("Limite Máximo do ADX", value=float(db.get_config("ADX_LIMIT") or 25.0), step=1.0)
 
 if st.sidebar.button("💾 Salvar Parâmetros"):
@@ -109,7 +109,8 @@ with tab2:
     
     if st.button("🔍 Iniciar Varredura de Cointegração"):
         with st.spinner("Baixando histórico da Binance e calculando Engle-Granger. Isso pode levar alguns segundos..."):
-            st.session_state.scan_results = scanner.run_market_scan()
+            current_tf = db.get_config("TIMEFRAME") or "5m"
+            st.session_state.scan_results = scanner.run_market_scan(interval=current_tf)
             
     if st.session_state.scan_results is not None:
         df_scan = st.session_state.scan_results
