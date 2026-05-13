@@ -4,10 +4,13 @@ import asyncio
 from datetime import datetime
 import os
 
-# MUDANÇA CRÍTICA 1: Caminho Absoluto
-# Isso garante que tanto o Painel quanto o Robô leiam exatamente o mesmo ficheiro físico no servidor.
+# MUDANÇA CRÍTICA 1: Caminho Dinâmico
+# Detecta se está em Docker ou local e ajusta o caminho do banco de dados.
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = "/app/data/bot_data.db"
+if os.path.exists("/app/data"):
+    DB_PATH = "/app/data/bot_data.db"
+else:
+    DB_PATH = os.path.join(BASE_DIR, "bot_data.db")
 
 def _get_conn():
     """Retorna uma conexão com modo WAL habilitado para suportar concorrência."""
@@ -43,10 +46,12 @@ def init_db():
             "BOT_STATUS": "OFF",
             "SYMBOL_A": "ADAUSDT",
             "SYMBOL_B": "XRPUSDT",
-            "TRADE_AMOUNT_USD": "15.0",
-            "TARGET_PNL_USD": "0.50",
-            "STOP_LOSS_USD": "15.00",
-            "ADX_LIMIT": "25.0"
+            "TRADE_AMOUNT_USD": "6.0",
+            "TARGET_PNL_USD": "0.25",
+            "STOP_LOSS_USD": "1.50",
+            "ADX_LIMIT": "25.0",
+            "Z_SCORE_LIMIT": "2.5",
+            "TIMEFRAME": "5m"
         }
         
         for k, v in default_configs.items():
