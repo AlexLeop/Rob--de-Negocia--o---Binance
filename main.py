@@ -41,7 +41,8 @@ async def monitorar_par(executor, pair_idx, symbol_a, symbol_b, initial_amount, 
             timeframe = await db.get_config_async("TIMEFRAME") or initial_tf
 
             # 1. Indicadores com Pearson
-            df_a, df_b = await asyncio.gather(executor.get_klines(symbol_a, timeframe), executor.get_klines(symbol_b, timeframe))
+            # Correção: 250 velas garantem o buffer do rolling(60) do Beta e do Z-Score
+            df_a, df_b = await asyncio.gather(executor.get_klines(symbol_a, timeframe, limit=250), executor.get_klines(symbol_b, timeframe, limit=250))
             result = PairsStrategy.calculate_indicators(df_a, df_b, Config)
             if result[0] is None:
                 await asyncio.sleep(5); continue
@@ -57,22 +58,29 @@ async def monitorar_par(executor, pair_idx, symbol_a, symbol_b, initial_amount, 
             status_txt = f"Par {pair_idx}: {symbol_a}/{symbol_b} | {'POSIÇÃO ABERTA' if is_open else 'Monitorando'}"
             await db.update_config_async("LIVE_STATUS", status_txt)
 
-            # 2. Gestão de Saída
+            # 2. Gestão de Saída (Corrigida)
             if is_open:
                 consecutive_triggers = 0
-                if abs(sig['z_score']) >= 4.0 or pnl >= target or pnl <= -stop:
+                
+                # Nova Regra: Se o spread voltou à normalidade (Z próximo de 0), fecha imediatamente.
+                reverteu_media = abs(sig['z_score']) < 0.5 
+                
+                if abs(sig['z_score']) >= 4.0 or pnl >= target or pnl <= -stop or reverteu_media:
                     in_critical_section = True
+                    motivo = "Reversão à Média" if reverteu_media else ("Take Profit" if pnl >= target else "Stop/Risco")
+                    print(f"🧹 [Par {pair_idx}] Fechando Posição. Motivo: {motivo} | PnL LIDO: {pnl:.2f} | Z: {sig['z_score']:.2f}")
+                    
                     await safe_close_pair(executor, symbol_a, symbol_b)
                     await db.save_trade_async(symbol_a, symbol_b, pnl)
                     in_critical_section = False
                     
-                    # Se foi Stop Loss, aplica cooldown maior (60s) para evitar repetição de erro
                     if pnl <= -stop:
-                        print(f"📉 [Par {pair_idx}] Stop Loss atingido. Entrando em Cooldown de 60s...")
+                        print(f"📉 [Par {pair_idx}] Stop Loss atingido. Cooldown de 60s...")
                         await asyncio.sleep(60)
                     else:
                         await asyncio.sleep(15)
-                else: await asyncio.sleep(3)
+                else: 
+                    await asyncio.sleep(3)
                 continue
 
             # BUG-11: Threshold de Half-Life Dinâmico (Máximo 2h de reversão)

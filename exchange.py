@@ -16,8 +16,13 @@ class BinanceExecutor:
         self._last_rules_time = 0
 
     async def connect(self):
-        self.client = await AsyncClient.create(self.api_key, self.api_secret)
+        # A flag testnet=True redireciona todas as chamadas para os servidores de simulação
+        self.client = await AsyncClient.create(self.api_key, self.api_secret, testnet=True)
         await self.refresh_exchange_info()
+
+    #async def connect(self):
+        #self.client = await AsyncClient.create(self.api_key, self.api_secret)
+        #await self.refresh_exchange_info()
 
     async def refresh_exchange_info(self):
         """Atualiza filtros de lote e nocional (Executado a cada 1h)."""
