@@ -400,9 +400,10 @@ async def monitorar_par(executor, pair_idx, symbol_a, symbol_b, initial_amount, 
                             print(f"🚨 Falha no Crédito (Venda)! Operação abortada."); 
                         
                         in_critical_section = False
-                        consecutive_triggers = 0; await asyncio.sleep(15)
-            else:
-                consecutive_triggers = 0; await asyncio.sleep(5)
+                        await asyncio.sleep(15)
+            
+            # Repouso obrigatório ao final de cada tick para não metralhar a API da Binance
+            await asyncio.sleep(5)
 
         except asyncio.CancelledError:
             if in_critical_section:
