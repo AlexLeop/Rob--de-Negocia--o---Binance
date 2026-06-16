@@ -337,11 +337,11 @@
                             <thead class="sticky top-0 bg-[#0B0F19] z-10 shadow-md">
                                 <tr>
                                     <th>Rank</th>
-                                    <th>Ativo A</th>
-                                    <th>Ativo B</th>
+                                    <th>Par Cointegrado (Spread)</th>
                                     <th class="text-right">P-Value</th>
                                     <th class="text-right">ADX Médio</th>
                                     <th class="text-right">Z-Score Atual</th>
+                                    <th>Recomendação</th>
                                     <th class="text-center">Ação</th>
                                 </tr>
                             </thead>
@@ -414,14 +414,13 @@
                     pairsContainer.innerHTML = '';
                     
                     if (data.num_pairs === 0) {
-                        pairsContainer.innerHTML = '<div class="col-span-3 text-center text-modern-textSecondary py-8 text-xs border border-dashed border-white/10 rounded-xl bg-white/[0.01]">Scanning market anomalies...</div>';
+                        pairsContainer.innerHTML = '<div class="col-span-3 text-center text-modern-textSecondary py-8 text-xs border border-dashed border-white/10 rounded-xl bg-white/[0.01]">Aguardando seleção de pares ou escaneamento...</div>';
                     } else {
                         data.pairs.forEach((pair, idx) => {
                             const zLimit = parseFloat(data.config.Z_SCORE_LIMIT);
                             const currentZ = parseFloat(pair.zscore);
                             const isExtreme = Math.abs(currentZ) >= zLimit;
                             
-                            // SOLID MUTED COLORS. NO GLOW.
                             const borderColor = isExtreme ? 'border-modern-danger/50' : 'border-white/5';
                             const zColor = isExtreme ? 'text-modern-danger' : 'text-white';
                             const badge = isExtreme ? '<span class="badge bg-modern-danger/20 text-modern-danger border border-modern-danger/50">CRIT</span>' : '<span class="badge bg-white/5 text-modern-textSecondary border border-white/10">MONITOR</span>';
@@ -435,10 +434,9 @@
                                 </div>
                                 <div class="mb-4">
                                     <div class="text-[13px] font-bold text-white tracking-wide mb-0.5 flex items-center gap-1.5">
-                                        <span class="w-1.5 h-1.5 rounded-full bg-blue-400"></span> ${pair.symbol_a}
-                                    </div>
-                                    <div class="text-[11px] font-semibold text-modern-textSecondary tracking-wide flex items-center gap-1.5">
-                                        <span class="w-1.5 h-1.5 rounded-full bg-purple-400"></span> ${pair.symbol_b}
+                                        <span class="text-blue-400">${pair.symbol_a}</span>
+                                        <span class="text-white/20 text-[10px] mx-1">×</span>
+                                        <span class="text-purple-400">${pair.symbol_b}</span>
                                     </div>
                                 </div>
                                 <div class="grid grid-cols-2 gap-2 mb-3">
@@ -489,17 +487,33 @@
                         data.scanner.forEach((s, idx) => {
                             const pval = parseFloat(s['P-Value'] || 0);
                             const zscore = parseFloat(s['Z-Score'] || 0);
+                            const zLimit = parseFloat(data.config.Z_SCORE_LIMIT || 2.5);
                             
-                            const zColor = Math.abs(zscore) >= parseFloat(data.config.Z_SCORE_LIMIT) ? 'text-modern-danger' : 'text-modern-accent';
+                            const zColor = Math.abs(zscore) >= zLimit ? 'text-modern-danger' : 'text-modern-accent';
+                            
+                            let recText = 'AGUARDANDO';
+                            let recClass = 'text-modern-textSecondary bg-white/5 border border-white/10';
+                            
+                            if (zscore <= -zLimit) {
+                                recText = 'LONG SPREAD';
+                                recClass = 'text-modern-success bg-modern-success/20 border border-modern-success/50';
+                            } else if (zscore >= zLimit) {
+                                recText = 'SHORT SPREAD';
+                                recClass = 'text-modern-danger bg-modern-danger/20 border border-modern-danger/50';
+                            }
                             
                             scanHtml += `
                             <tr>
                                 <td class="font-bold text-modern-textSecondary">#${idx + 1}</td>
-                                <td class="font-bold text-white"><span class="w-1.5 h-1.5 inline-block rounded-full bg-blue-400 mr-1"></span>${s['Ativo A']}</td>
-                                <td class="font-bold text-white"><span class="w-1.5 h-1.5 inline-block rounded-full bg-purple-400 mr-1"></span>${s['Ativo B']}</td>
+                                <td class="font-bold text-white tracking-wide">
+                                    <span class="text-blue-400">${s['Ativo A']}</span> 
+                                    <span class="text-white/20 text-[10px] mx-1">×</span> 
+                                    <span class="text-purple-400">${s['Ativo B']}</span>
+                                </td>
                                 <td class="text-right font-mono text-modern-success">${pval.toFixed(4)}</td>
                                 <td class="text-right font-mono">${(s['ADX Médio'] || 0).toFixed(1)}</td>
                                 <td class="text-right font-mono font-bold ${zColor}">${zscore.toFixed(2)}</td>
+                                <td><span class="badge ${recClass}">${recText}</span></td>
                                 <td class="text-center">
                                     <button onclick="addToStrategy('${s['Ativo A']}', '${s['Ativo B']}')" class="bg-modern-success/20 hover:bg-modern-success/40 text-modern-success border border-modern-success/30 px-3 py-1 rounded text-[9px] font-bold uppercase tracking-widest transition-colors">
                                         + Add
