@@ -12,7 +12,7 @@ BASE_URL = "https://testnet.binancefuture.com" if Config.TESTNET else "https://f
 
 scanner_sem = asyncio.Semaphore(20)
 
-async def _fetch_klines(session, symbol, interval="5m", limit=200):
+async def _fetch_klines(session, symbol, interval="5m", limit=250):
     async with scanner_sem:
         url = f"{BASE_URL}/fapi/v1/klines?symbol={symbol}&interval={interval}&limit={limit}"
         try:
@@ -52,7 +52,7 @@ def _compute_coint_chunk(pairs_chunk, valid_data):
                 if corr > 0.50:
                     status = "✅ Excelente" if p_value < 0.01 else "⚠️ Aceitável"
                     
-                    window = 60
+                    window = 240
                     # Rolling Beta idêntico ao strategy.py
                     df_log_a = pd.Series(log_a)
                     df_log_b = pd.Series(log_b)
@@ -83,7 +83,7 @@ def _compute_coint_chunk(pairs_chunk, valid_data):
             pass
     return results
 
-async def run_market_scan_async(interval="5m", limit=200):
+async def run_market_scan_async(interval="5m", limit=250):
     print(f"🔍 [Scanner] Iniciando Scan Global em {interval} (Limite: {limit} candles)...")
     
     # 1. Fetch Top 150 ativos por Volume (Mais abrangência de mercado)
@@ -125,7 +125,7 @@ async def run_market_scan_async(interval="5m", limit=200):
     return df_results
 
 # Função Síncrona de fallback para ser chamada pelo Streamlit Dashboard
-def run_market_scan(interval="5m", limit=200):
+def run_market_scan(interval="5m", limit=250):
     try:
         loop = asyncio.get_event_loop()
     except RuntimeError:
