@@ -113,7 +113,8 @@ class BinanceExecutor:
             
             step_size = self.rules[symbol]['stepSize']
             precision = int(round(-math.log10(step_size), 0))
-            final_qty = math.floor((qty_coins / step_size) + 1e-8) * step_size
+            # VULN: Usar math.ceil em vez de math.floor para garantir que o arredondamento não viole o Minimum Notional
+            final_qty = math.ceil((qty_coins / step_size) - 1e-8) * step_size
             
             # VULN F: Força Cast para Inteiro se precisão for 0 (Binance restringe .0 em moedas meme)
             if precision <= 0:
