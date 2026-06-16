@@ -146,7 +146,8 @@ async def monitorar_par(executor, pair_idx, symbol_a, symbol_b, initial_amount, 
             # Atualizar radar
             await db.update_config_async(f"LIVE_ZSCORE_{pair_idx}", f"{sig['z_score']:.2f}")
             await db.update_config_async(f"LIVE_ADX_{pair_idx}", f"{sig['adx']:.2f}")
-            status_txt = f"Par {pair_idx}: {symbol_a}/{symbol_b} | {'POSIÇÃO ABERTA' if is_open else 'Monitorando'}"
+            status_desc = 'POSIÇÃO ABERTA' if is_open else ('Armado (Aguardando Hook)' if peak_z_score != 0.0 else 'Monitorando')
+            status_txt = f"Par {pair_idx}: {symbol_a}/{symbol_b} | {status_desc}"
             await db.update_config_async(f"LIVE_STATUS_{pair_idx}", status_txt)
 
             # 4. Gestão de Saída
@@ -320,13 +321,11 @@ async def monitorar_par(executor, pair_idx, symbol_a, symbol_b, initial_amount, 
             if abs(sig['z_score']) > z_limit or peak_z_score != 0.0:
                 if abs(sig['z_score']) > abs(peak_z_score) and abs(sig['z_score']) > z_limit:
                     peak_z_score = sig['z_score']
-                    await db.update_config_async(f"LIVE_STATUS_{pair_idx}", "Armado: Aguardando Gatilho (Hook)...")
                     await asyncio.sleep(1); continue
                 
                 # Desarma se a anomalia já passou do ponto (evita entrar atrasado)
                 if abs(peak_z_score) - abs(sig['z_score']) > 0.5:
                     peak_z_score = 0.0
-                    await db.update_config_async(f"LIVE_STATUS_{pair_idx}", "Monitorando")
                     await asyncio.sleep(5); continue
                 
                 # Gatilho de Confirmação (Z-Score Hook): Recuo de 0.1 do pico

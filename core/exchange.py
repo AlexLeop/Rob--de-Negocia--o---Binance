@@ -208,8 +208,8 @@ class BinanceExecutor:
             for col in ['open', 'high', 'low', 'close']:
                 df[col] = df[col].astype(float)
             
-            # Remove o último candle pois ele ainda não fechou (evita falsos positivos por Repaint)
-            return df.iloc[:-1][['open', 'high', 'low', 'close']]
+            # Mantém o candle atual para análise em tempo real (Tick-by-tick Z-Score)
+            return df[['open', 'high', 'low', 'close']]
         except BinanceAPIException as e:
             self.health.record(False)
             raise e
