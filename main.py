@@ -628,21 +628,34 @@ async def main():
                         print("🚨 [Erro] Sobreposição de ativos detectada! Cada par deve ter ativos únicos para evitar contaminação de PnL.")
                         await asyncio.sleep(10); continue
 
-                    for t in tarefas: t.cancel()
-                    tarefas = []
                     if len(la) == len(lb) > 0:
+                        novas_tarefas = []
                         for i in range(len(la)):
-                            t = asyncio.create_task(supervisor_par(
-                                executor, i, la[i], lb[i], 
-                                float(await db.get_config_async("TRADE_AMOUNT_USD") or 30.0), 
-                                float(await db.get_config_async("TARGET_PNL_USD") or 1.50), 
-                                float(await db.get_config_async("STOP_LOSS_USD") or 1.00), 
-                                float(await db.get_config_async("ADX_LIMIT") or 25.0), 
-                                float(await db.get_config_async("Z_SCORE_LIMIT") or 2.5), 
-                                await db.get_config_async("TIMEFRAME") or "5m", 
-                                i * 2
-                            ))
-                            tarefas.append(t)
+                            # Mantém a thread antiga se o par no slot não mudou
+                            if i < len(last_a) and (la[i] == last_a[i] and lb[i] == last_b[i]) and i < len(tarefas) and not tarefas[i].done():
+                                novas_tarefas.append(tarefas[i])
+                            else:
+                                if i < len(tarefas) and not tarefas[i].done():
+                                    tarefas[i].cancel()
+                                
+                                t = asyncio.create_task(supervisor_par(
+                                    executor, i, la[i], lb[i], 
+                                    float(await db.get_config_async("TRADE_AMOUNT_USD") or 30.0), 
+                                    float(await db.get_config_async("TARGET_PNL_USD") or 1.50), 
+                                    float(await db.get_config_async("STOP_LOSS_USD") or 1.00), 
+                                    float(await db.get_config_async("ADX_LIMIT") or 25.0), 
+                                    float(await db.get_config_async("Z_SCORE_LIMIT") or 2.5), 
+                                    await db.get_config_async("TIMEFRAME") or "5m", 
+                                    i * 2
+                                ))
+                                novas_tarefas.append(t)
+                        
+                        # Cancela tarefas excedentes se a lista encolheu
+                        for i in range(len(la), len(tarefas)):
+                            if not tarefas[i].done():
+                                tarefas[i].cancel()
+                                
+                        tarefas = novas_tarefas
                         last_a, last_b = la.copy(), lb.copy()
                 await asyncio.sleep(10)
             except asyncio.CancelledError:
