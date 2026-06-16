@@ -508,6 +508,7 @@ async def auto_scan_pairs(db_conn, executor):
         la_current = [s.strip().upper() for s in str_a.split(",") if s.strip()]
         lb_current = [s.strip().upper() for s in str_b.split(",") if s.strip()]
         
+        MAX_PARES = 8
         novos_a = [None] * MAX_PARES
         novos_b = [None] * MAX_PARES
         ativos_usados = set()
