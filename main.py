@@ -449,14 +449,15 @@ async def global_circuit_breaker(executor):
     print("🛡️ [Circuit Breaker] Ativado em vigilância máxima (1s).")
     while True:
         try:
+            eq = await executor.get_total_equity()
+            if eq is not None:
+                await db.update_config_async("LIVE_BALANCE", f"{eq:.2f}")
+
             if await db.get_config_async("BOT_STATUS") == "OFF":
                 await asyncio.sleep(5); continue
 
-            eq = await executor.get_total_equity()
             if eq is None: 
-                await asyncio.sleep(2); continue # VULN E: Proteção Alucinação $5000
-
-            await db.update_config_async("LIVE_BALANCE", f"{eq:.2f}")
+                await asyncio.sleep(2); continue # Proteção Alucinação
 
             hwm_str = await db.get_config_async("HIGH_WATER_MARK_USD")
             hwm = float(hwm_str) if hwm_str else eq

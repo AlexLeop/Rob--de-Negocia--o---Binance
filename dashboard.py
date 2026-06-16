@@ -21,7 +21,7 @@ def api_data():
     # Coletar estatísticas básicas
     df_trades = db.get_pnl_history()
     
-    current_balance = float(db.get_config("LIVE_BALANCE") or 5000.0)
+    current_balance = float(db.get_config("LIVE_BALANCE") or 0.0)
     total_pnl = float(db.get_config("TOTAL_PNL") or 0.0)
     
     win_rate = 0.0
