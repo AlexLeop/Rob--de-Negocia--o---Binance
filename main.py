@@ -217,23 +217,28 @@ async def monitorar_par(executor, pair_idx, symbol_a, symbol_b, initial_amount, 
                             # Micro-Loop de Trailing Stop Isolado (Bypass VULN S e Z-Score)
                             print(f"🌊 [Trend Surfing] Ativando Trailing Stop isolado para {symbol_a}...")
                             highest_pnl = pnl_a
-                            while True:
-                                await asyncio.sleep(5)
-                                if await db.get_config_async("BOT_STATUS") != "ON": break
-                                
-                                _, _, current_pos_a, _ = await executor.get_positions_pnl(symbol_a, symbol_b)
-                                if not current_pos_a or abs(float(current_pos_a['positionAmt'])) < 1e-8:
-                                    print(f"🛑 [Trend Surfing] Posição {symbol_a} encerrada externamente.")
-                                    break
-                                
-                                current_pnl = float(current_pos_a['unRealizedProfit'])
-                                if current_pnl > highest_pnl: highest_pnl = current_pnl
-                                
-                                if current_pnl < (highest_pnl * 0.85): # Trailing de 15%
-                                    print(f"🛑 [Trend Surfing] Trailing Stop acionado em {symbol_a}! Lucro Retido: ${current_pnl:.2f} (Topo: ${highest_pnl:.2f})")
-                                    await executor.cancel_all_orders(symbol_a)
-                                    await executor.close_position(current_pos_a)
-                                    break
+                            try:
+                                while True:
+                                    await asyncio.sleep(5)
+                                    if await db.get_config_async("BOT_STATUS") != "ON": break
+                                    
+                                    _, _, current_pos_a, _ = await executor.get_positions_pnl(symbol_a, symbol_b)
+                                    if not current_pos_a or abs(float(current_pos_a['positionAmt'])) < 1e-8:
+                                        print(f"🛑 [Trend Surfing] Posição {symbol_a} encerrada externamente.")
+                                        break
+                                    
+                                    current_pnl = float(current_pos_a['unRealizedProfit'])
+                                    if current_pnl > highest_pnl: highest_pnl = current_pnl
+                                    
+                                    if current_pnl < (highest_pnl * 0.85): # Trailing de 15%
+                                        print(f"🛑 [Trend Surfing] Trailing Stop acionado em {symbol_a}! Lucro Retido: ${current_pnl:.2f} (Topo: ${highest_pnl:.2f})")
+                                        await executor.cancel_all_orders(symbol_a)
+                                        await executor.close_position(current_pos_a)
+                                        break
+                            except asyncio.CancelledError:
+                                print(f"⚠️ [Trend Surfing] Task cancelada! Fechando {symbol_a} por segurança.")
+                                await safe_close_pair(executor, symbol_a, symbol_b)
+                                raise
                                     
                             await db.update_config_async(f"TREND_SURFING_{symbol_a}", "")
                             in_critical_section = False
@@ -248,23 +253,28 @@ async def monitorar_par(executor, pair_idx, symbol_a, symbol_b, initial_amount, 
                             # Micro-Loop de Trailing Stop Isolado (Bypass VULN S e Z-Score)
                             print(f"🌊 [Trend Surfing] Ativando Trailing Stop isolado para {symbol_b}...")
                             highest_pnl = pnl_b
-                            while True:
-                                await asyncio.sleep(5)
-                                if await db.get_config_async("BOT_STATUS") != "ON": break
-                                
-                                _, _, _, current_pos_b = await executor.get_positions_pnl(symbol_a, symbol_b)
-                                if not current_pos_b or abs(float(current_pos_b['positionAmt'])) < 1e-8:
-                                    print(f"🛑 [Trend Surfing] Posição {symbol_b} encerrada externamente.")
-                                    break
-                                
-                                current_pnl = float(current_pos_b['unRealizedProfit'])
-                                if current_pnl > highest_pnl: highest_pnl = current_pnl
-                                
-                                if current_pnl < (highest_pnl * 0.85): # Trailing de 15%
-                                    print(f"🛑 [Trend Surfing] Trailing Stop acionado em {symbol_b}! Lucro Retido: ${current_pnl:.2f} (Topo: ${highest_pnl:.2f})")
-                                    await executor.cancel_all_orders(symbol_b)
-                                    await executor.close_position(current_pos_b)
-                                    break
+                            try:
+                                while True:
+                                    await asyncio.sleep(5)
+                                    if await db.get_config_async("BOT_STATUS") != "ON": break
+                                    
+                                    _, _, _, current_pos_b = await executor.get_positions_pnl(symbol_a, symbol_b)
+                                    if not current_pos_b or abs(float(current_pos_b['positionAmt'])) < 1e-8:
+                                        print(f"🛑 [Trend Surfing] Posição {symbol_b} encerrada externamente.")
+                                        break
+                                    
+                                    current_pnl = float(current_pos_b['unRealizedProfit'])
+                                    if current_pnl > highest_pnl: highest_pnl = current_pnl
+                                    
+                                    if current_pnl < (highest_pnl * 0.85): # Trailing de 15%
+                                        print(f"🛑 [Trend Surfing] Trailing Stop acionado em {symbol_b}! Lucro Retido: ${current_pnl:.2f} (Topo: ${highest_pnl:.2f})")
+                                        await executor.cancel_all_orders(symbol_b)
+                                        await executor.close_position(current_pos_b)
+                                        break
+                            except asyncio.CancelledError:
+                                print(f"⚠️ [Trend Surfing] Task cancelada! Fechando {symbol_b} por segurança.")
+                                await safe_close_pair(executor, symbol_a, symbol_b)
+                                raise
                                     
                             await db.update_config_async(f"TREND_SURFING_{symbol_b}", "")
                             in_critical_section = False

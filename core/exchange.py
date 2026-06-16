@@ -98,7 +98,8 @@ class BinanceExecutor:
         try:
             # Puxa a alavancagem configurada no painel e injeta na Binance
             import core.database as db
-            leverage = int(float(db.get_config("LEVERAGE") or Config.LEVERAGE))
+            leverage_str = await db.get_config_async("LEVERAGE")
+            leverage = int(float(leverage_str or Config.LEVERAGE))
             try:
                 await self.client.futures_change_leverage(symbol=symbol, leverage=leverage)
                 print(f"🔧 [Exchange] Alavancagem ajustada para {leverage}x em {symbol}.")

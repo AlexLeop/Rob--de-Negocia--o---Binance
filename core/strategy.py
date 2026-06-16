@@ -92,7 +92,7 @@ class PairsStrategy:
         
         # BUG-12: Half-life como valor escalar único (último calculado)
         hl_series = df['spread'].dropna()
-        latest_hl = PairsStrategy.calculate_half_life(hl_series) if len(hl_series) > 30 else 999.0
+        latest_hl = PairsStrategy.calculate_half_life(hl_series.iloc[-config.Z_WINDOW:]) if len(hl_series) > 30 else 999.0
         df['half_life'] = latest_hl
         
         # BUG-10: Correlação de Pearson em Log-Retornos (Estatisticamente correto)
