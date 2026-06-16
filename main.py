@@ -397,6 +397,10 @@ async def monitorar_par(executor, pair_idx, symbol_a, symbol_b, initial_amount, 
                             else:
                                 adjusted_amt_compra = real_notional_venda / abs(beta)
                                 
+                            # VULN: Garante que a perna 2 não quebre o limite mínimo de Notional da Binance
+                            if adjusted_amt_compra < 5.5:
+                                adjusted_amt_compra = 5.5
+                                
                             print(f"⚡ [Par {pair_idx}] Executando Débito (Compra/Long financiado) em {perna_compra} (Ajustado: ${adjusted_amt_compra:.2f})...")
                             res_compra = await executor.execute_market_order(perna_compra, 'BUY', adjusted_amt_compra)
                             
