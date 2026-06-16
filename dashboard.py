@@ -80,6 +80,16 @@ def api_data():
         "SYMBOL_B": str_b
     }
 
+    # Obter resultados do Scanner
+    import json
+    scan_raw = db.get_config("LATEST_SCAN_RESULTS")
+    scanner_data = []
+    if scan_raw:
+        try:
+            scanner_data = json.loads(scan_raw)
+        except:
+            pass
+
     return jsonify({
         "balance": current_balance,
         "total_pnl": total_pnl,
@@ -88,7 +98,8 @@ def api_data():
         "num_pairs": num_pairs,
         "pairs": pairs_data,
         "config": config_data,
-        "trades": trades_json
+        "trades": trades_json,
+        "scanner": scanner_data
     })
 
 @app.route('/api/toggle', methods=['POST'])

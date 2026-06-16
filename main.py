@@ -1,5 +1,6 @@
 import asyncio
 import time
+import json
 import core.database as db
 from core.config import Config
 from core.exchange import BinanceExecutor
@@ -519,7 +520,20 @@ async def auto_scan_pairs(db_conn, executor):
         MAX_PARES = 8
         
         if df is not None and not df.empty:
-            for _, row in df.iterrows():
+            # Salvar resultados brutos para o painel (Market Scanner)
+            # Ordenamos por Z-Score Absoluto
+            df_sorted = df.copy()
+            df_sorted['abs_z'] = df_sorted['Z-Score'].abs()
+            df_sorted = df_sorted.sort_values(by='abs_z', ascending=False).drop(columns=['abs_z'])
+            
+            scan_json = df_sorted.head(50).to_json(orient="records")
+            await db.update_config_async("LATEST_SCAN_RESULTS", scan_json)
+            
+            if await db.get_config_async("AUTO_SCAN") == "OFF":
+                print("✅ [Scanner] Radar Quantitativo atualizado (Auto-Deploy DESLIGADO).")
+                return
+
+            for _, row in df_sorted.iterrows():
                 if len(novos_a) >= MAX_PARES: break
                 a, b = row['Ativo A'], row['Ativo B']
                 if a not in ativos_usados and b not in ativos_usados:
@@ -532,7 +546,7 @@ async def auto_scan_pairs(db_conn, executor):
             str_novos_b = ",".join(novos_b)
             await db.update_config_async("SYMBOL_A", str_novos_a)
             await db.update_config_async("SYMBOL_B", str_novos_b)
-            print(f"✅ [Scanner] Frota montada: {str_novos_a} / {str_novos_b}")
+            print(f"✅ [Scanner] Frota montada automaticamente: {str_novos_a} / {str_novos_b}")
     except Exception as e:
         print(f"⚠️ [Scanner] Erro no auto-scan: {e}")
 
@@ -572,9 +586,9 @@ async def main():
 
                     await asyncio.sleep(5); continue
 
-                # Roda o Scanner Automaticamente se não tiver tarefas ativas em posições
-                if await db.get_config_async("AUTO_SCAN") != "OFF":
-                    await auto_scan_pairs(db, executor)
+                # Roda o Scanner Automaticamente sempre para preencher a aba "Market Scanner"
+                # A decisão de injetar ou não na frota é controlada internamente
+                await auto_scan_pairs(db, executor)
 
                 str_a = await db.get_config_async("SYMBOL_A") or ""
                 str_b = await db.get_config_async("SYMBOL_B") or ""
