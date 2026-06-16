@@ -336,13 +336,14 @@
                         <table class="w-full data-grid whitespace-nowrap">
                             <thead class="sticky top-0 bg-[#0B0F19] z-10 shadow-md">
                                 <tr>
-                                    <th>Rank</th>
-                                    <th>Par Cointegrado (Spread)</th>
+                                    <th class="text-left">Rank</th>
+                                    <th class="text-left">Ativo A</th>
+                                    <th class="text-left">Ativo B</th>
                                     <th class="text-right">P-Value</th>
                                     <th class="text-right">ADX Médio</th>
                                     <th class="text-right">Z-Score Atual</th>
-                                    <th>Recomendação</th>
-                                    <th class="text-center">Ação</th>
+                                    <th class="text-left">Recomendação</th>
+                                    <th class="text-center w-24">Ação</th>
                                 </tr>
                             </thead>
                             <tbody id="scanner-body">
@@ -504,17 +505,14 @@
                             
                             scanHtml += `
                             <tr>
-                                <td class="font-bold text-modern-textSecondary">#${idx + 1}</td>
-                                <td class="font-bold text-white tracking-wide">
-                                    <span class="text-blue-400">${s['Ativo A']}</span> 
-                                    <span class="text-white/20 text-[10px] mx-1">×</span> 
-                                    <span class="text-purple-400">${s['Ativo B']}</span>
-                                </td>
+                                <td class="font-bold text-modern-textSecondary text-left">#${idx + 1}</td>
+                                <td class="font-bold text-white tracking-wide text-left"><span class="w-1.5 h-1.5 inline-block rounded-full bg-blue-400 mr-1"></span>${s['Ativo A']}</td>
+                                <td class="font-bold text-white tracking-wide text-left"><span class="w-1.5 h-1.5 inline-block rounded-full bg-purple-400 mr-1"></span>${s['Ativo B']}</td>
                                 <td class="text-right font-mono text-modern-success">${pval.toFixed(4)}</td>
                                 <td class="text-right font-mono">${(s['ADX Médio'] || 0).toFixed(1)}</td>
                                 <td class="text-right font-mono font-bold ${zColor}">${zscore.toFixed(2)}</td>
-                                <td><span class="badge ${recClass}">${recText}</span></td>
-                                <td class="text-center">
+                                <td class="text-left"><span class="badge ${recClass}">${recText}</span></td>
+                                <td class="text-center w-24">
                                     <button onclick="addToStrategy('${s['Ativo A']}', '${s['Ativo B']}')" class="bg-modern-success/20 hover:bg-modern-success/40 text-modern-success border border-modern-success/30 px-3 py-1 rounded text-[9px] font-bold uppercase tracking-widest transition-colors">
                                         + Add
                                     </button>
