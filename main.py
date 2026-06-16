@@ -502,13 +502,16 @@ async def auto_scan_pairs(db_conn, executor):
         la_current = [s.strip().upper() for s in str_a.split(",") if s.strip()]
         lb_current = [s.strip().upper() for s in str_b.split(",") if s.strip()]
         
-        novos_a, novos_b = [], []
+        novos_a = [None] * MAX_PARES
+        novos_b = [None] * MAX_PARES
         ativos_usados = set()
         
-        for a, b in zip(la_current, lb_current):
+        # 1. Trava pares ativos (posição fixa)
+        for i, (a, b) in enumerate(zip(la_current, lb_current)):
+            if i >= MAX_PARES: break
             if a in abertas or b in abertas:
-                novos_a.append(a)
-                novos_b.append(b)
+                novos_a[i] = a
+                novos_b[i] = b
                 ativos_usados.add(a)
                 ativos_usados.add(b)
                 print(f"🛡️ [Scanner] Protegendo trade ativo: {a}/{b}")
@@ -516,11 +519,8 @@ async def auto_scan_pairs(db_conn, executor):
         _last_scan = time.time()
         print("🔍 [Scanner] Iniciando re-scan de cointegração para preencher frota...")
         df = await run_market_scan_async("5m", 250)
-
-        MAX_PARES = 8
         
         if df is not None and not df.empty:
-            # Salvar resultados brutos para o painel (Market Scanner)
             # Ordenamos por Z-Score Absoluto
             df_sorted = df.copy()
             df_sorted['abs_z'] = df_sorted['Z-Score'].abs()
@@ -533,15 +533,35 @@ async def auto_scan_pairs(db_conn, executor):
                 print("✅ [Scanner] Radar Quantitativo atualizado (Auto-Deploy DESLIGADO).")
                 return
 
+            # 2. Mantém os pares antigos nos MESMOS SLOTS se ainda estiverem entre os Top 15
+            # Isso evita matar a thread e resetar o 'peak_z_score' (Hook) a cada 3 minutos
+            top_15_scanner = [(r['Ativo A'], r['Ativo B']) for _, r in df_sorted.head(15).iterrows()]
+            for i, (a, b) in enumerate(zip(la_current, lb_current)):
+                if i >= MAX_PARES: break
+                if novos_a[i] is None:
+                    if (a, b) in top_15_scanner and a not in ativos_usados and b not in ativos_usados:
+                        novos_a[i] = a
+                        novos_b[i] = b
+                        ativos_usados.add(a)
+                        ativos_usados.add(b)
+
+            # 3. Preenche os slots vazios restantes com os melhores do scanner
             for _, row in df_sorted.iterrows():
-                if len(novos_a) >= MAX_PARES: break
                 a, b = row['Ativo A'], row['Ativo B']
                 if a not in ativos_usados and b not in ativos_usados:
-                    novos_a.append(a)
-                    novos_b.append(b)
-                    ativos_usados.add(a)
-                    ativos_usados.add(b)
-                    
+                    try:
+                        idx = novos_a.index(None)
+                        novos_a[idx] = a
+                        novos_b[idx] = b
+                        ativos_usados.add(a)
+                        ativos_usados.add(b)
+                    except ValueError:
+                        break # Sem mais slots vazios
+                        
+            # Limpa Nones residuais
+            novos_a = [x for x in novos_a if x is not None]
+            novos_b = [x for x in novos_b if x is not None]
+            
             str_novos_a = ",".join(novos_a)
             str_novos_b = ",".join(novos_b)
             await db.update_config_async("SYMBOL_A", str_novos_a)
