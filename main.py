@@ -324,7 +324,8 @@ async def monitorar_par(executor, pair_idx, symbol_a, symbol_b, initial_amount, 
                     await asyncio.sleep(1); continue
                 
                 # Desarma se a anomalia já passou do ponto (evita entrar atrasado)
-                if abs(peak_z_score) - abs(sig['z_score']) > 0.5:
+                if abs(peak_z_score) - abs(sig['z_score']) > 2.0:
+                    print(f"⚠️ [Par {pair_idx}] Z-Score despencou {abs(peak_z_score) - abs(sig['z_score']):.2f} instantaneamente! Abortando Hook.")
                     peak_z_score = 0.0
                     await asyncio.sleep(5); continue
                 
