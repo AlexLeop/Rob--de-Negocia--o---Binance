@@ -49,7 +49,7 @@ def _compute_coint_chunk(pairs_chunk, valid_data):
                 ret_b = np.diff(log_b)
                 corr = np.corrcoef(ret_a, ret_b)[0, 1]
                 
-                if corr > 0.70:
+                if corr > 0.50:
                     status = "✅ Excelente" if p_value < 0.01 else "⚠️ Aceitável"
                     
                     window = 60
@@ -86,14 +86,14 @@ def _compute_coint_chunk(pairs_chunk, valid_data):
 async def run_market_scan_async(interval="5m", limit=200):
     print(f"🔍 [Scanner] Iniciando Scan Global em {interval} (Limite: {limit} candles)...")
     
-    # 1. Fetch Top 80 ativos por Volume (Garante ativos líquidos e filtra tranqueiras)
+    # 1. Fetch Top 150 ativos por Volume (Mais abrangência de mercado)
     async with aiohttp.ClientSession() as session:
         async with session.get(f"{BASE_URL}/fapi/v1/ticker/24hr") as resp:
             tickers = await resp.json()
             
         usdt_pairs = [t for t in tickers if t['symbol'].endswith('USDT')]
         usdt_pairs.sort(key=lambda x: float(x['quoteVolume']), reverse=True)
-        top_symbols = [t['symbol'] for t in usdt_pairs[:80]] # 80 ativos = 3160 cruzamentos (Prevenção de OOM)
+        top_symbols = [t['symbol'] for t in usdt_pairs[:150]] # 150 ativos = ~11.175 cruzamentos
         
         # 2. Fetch K-lines assincronamente (Extremamente rápido)
         tasks = [_fetch_klines(session, sym, interval, limit) for sym in top_symbols]
