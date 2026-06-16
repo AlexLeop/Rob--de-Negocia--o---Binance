@@ -30,7 +30,8 @@ class BinanceExecutor:
         self.client = AsyncClient(self.api_key, self.api_secret, testnet=Config.TESTNET)
         # VULN R: Sincronização Quântica de Tempo (RecvWindow Ban Immunization)
         try:
-            await self.client.load_time_difference()
+            res = await self.client.get_server_time()
+            self.client.timestamp_offset = res['serverTime'] - int(time.time() * 1000)
             print("⏳ [Exchange] Offset de tempo sincronizado com a Binance.")
         except Exception as e:
             print(f"⚠️ [Exchange] Falha ao sincronizar tempo: {e}")

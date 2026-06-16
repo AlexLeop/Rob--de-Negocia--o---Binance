@@ -93,7 +93,7 @@ async def run_market_scan_async(interval="5m", limit=200):
             
         usdt_pairs = [t for t in tickers if t['symbol'].endswith('USDT')]
         usdt_pairs.sort(key=lambda x: float(x['quoteVolume']), reverse=True)
-        top_symbols = [t['symbol'] for t in usdt_pairs[:120]] # 120 ativos = 7140 cruzamentos
+        top_symbols = [t['symbol'] for t in usdt_pairs[:80]] # 80 ativos = 3160 cruzamentos (Prevenção de OOM)
         
         # 2. Fetch K-lines assincronamente (Extremamente rápido)
         tasks = [_fetch_klines(session, sym, interval, limit) for sym in top_symbols]
@@ -109,7 +109,8 @@ async def run_market_scan_async(interval="5m", limit=200):
     chunks = [pairs[i:i + chunk_size] for i in range(0, len(pairs), chunk_size)]
     
     final_results = []
-    with ThreadPoolExecutor(max_workers=4) as executor:
+    # Usando 2 workers para evitar pico de memória (OOMKilled) em VPS pequena
+    with ThreadPoolExecutor(max_workers=2) as executor:
         tasks = [loop.run_in_executor(executor, _compute_coint_chunk, chunk, valid_data) for chunk in chunks]
         res_chunks = await asyncio.gather(*tasks)
         for rc in res_chunks:

@@ -6,5 +6,6 @@ while true; do
     sleep 10
 done &
 
-# Inicia a interface web Flask na porta principal (5000) via Gunicorn (Production Grade)
-gunicorn --bind 0.0.0.0:5000 dashboard:app
+# Inicia a interface web Flask na porta principal via Gunicorn (Production Grade)
+# Suporte a provedores serverless/PaaS usando a variável $PORT
+gunicorn --bind 0.0.0.0:${PORT:-5000} dashboard:app
