@@ -317,11 +317,17 @@ async def monitorar_par(executor, pair_idx, symbol_a, symbol_b, initial_amount, 
             max_halflife_candles = 240 / minutes_per_candle
             pearson_ok = sig.get('correlation', 0) >= 0.70
             
-            if abs(sig['z_score']) > z_limit:
-                if abs(sig['z_score']) > abs(peak_z_score):
+            if abs(sig['z_score']) > z_limit or peak_z_score != 0.0:
+                if abs(sig['z_score']) > abs(peak_z_score) and abs(sig['z_score']) > z_limit:
                     peak_z_score = sig['z_score']
                     await db.update_config_async(f"LIVE_STATUS_{pair_idx}", "Armado: Aguardando Gatilho (Hook)...")
                     await asyncio.sleep(1); continue
+                
+                # Desarma se a anomalia já passou do ponto (evita entrar atrasado)
+                if abs(peak_z_score) - abs(sig['z_score']) > 0.5:
+                    peak_z_score = 0.0
+                    await db.update_config_async(f"LIVE_STATUS_{pair_idx}", "Monitorando")
+                    await asyncio.sleep(5); continue
                 
                 # Gatilho de Confirmação (Z-Score Hook): Recuo de 0.1 do pico
                 if abs(peak_z_score) - abs(sig['z_score']) >= 0.1:
