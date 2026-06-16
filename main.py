@@ -329,6 +329,13 @@ async def monitorar_par(executor, pair_idx, symbol_a, symbol_b, initial_amount, 
             pearson_ok = sig.get('correlation', 0) >= 0.50
             
             if abs(sig['z_score']) > z_limit or peak_z_score != 0.0:
+                # Calcula Lucro Bruto Esperado (Z-score * Desvio Padrão do Spread). Taker fee é 0.20% ida e volta.
+                expected_profit = abs(sig['z_score']) * sig.get('std', 0.0)
+                if expected_profit < 0.0035:
+                    print(f"⚠️ [Par {pair_idx}] Aguardando: Spread muito estreito (Lucro Esperado: {expected_profit*100:.2f}% < 0.35% Tx+Margem).")
+                    peak_z_score = 0.0
+                    await asyncio.sleep(5); continue
+
                 if abs(sig['z_score']) > abs(peak_z_score) and abs(sig['z_score']) > z_limit:
                     peak_z_score = sig['z_score']
                     await asyncio.sleep(1); continue

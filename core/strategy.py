@@ -89,6 +89,7 @@ class PairsStrategy:
         mean = df['spread'].rolling(window=config.Z_WINDOW).mean()
         std = df['spread'].rolling(window=config.Z_WINDOW).std().replace(0, 1e-8)
         df['z_score'] = (df['spread'] - mean) / std
+        df['std'] = std
         
         # BUG-12: Half-life como valor escalar único (último calculado)
         hl_series = df['spread'].dropna()
@@ -118,5 +119,6 @@ class PairsStrategy:
             'adx': last_row['adx'],
             'half_life': last_row['half_life'],
             'correlation': last_row['correlation'],
-            'beta': last_row['beta']
+            'beta': last_row['beta'],
+            'std': last_row['std']
         }
