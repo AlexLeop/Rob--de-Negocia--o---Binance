@@ -6,3 +6,5 @@ numpy
 flask
 aiohttp
 gunicorn
+tzlocal
+dateparser<1.2.0
