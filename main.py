@@ -539,8 +539,9 @@ async def auto_scan_pairs(db_conn, executor):
                 print(f"🛡️ [Scanner] Protegendo trade ativo: {a}/{b}")
             
         _last_scan = time.time()
-        print("🔍 [Scanner] Iniciando re-scan de cointegração para preencher frota...")
-        df = await run_market_scan_async("5m", 250)
+        timeframe = await db.get_config_async("TIMEFRAME") or "5m"
+        print(f"🔍 [Scanner] Iniciando re-scan de cointegração para preencher frota em {timeframe}...")
+        df = await run_market_scan_async(timeframe, 250)
         
         if df is not None and not df.empty:
             # Ordenamos por Z-Score Absoluto
