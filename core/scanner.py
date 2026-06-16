@@ -49,7 +49,7 @@ def _compute_coint_chunk(pairs_chunk, valid_data):
                 ret_b = np.diff(log_b)
                 corr = np.corrcoef(ret_a, ret_b)[0, 1]
                 
-                if corr >= 0.70:
+                if corr >= 0.50:
                     status = "✅ Excelente" if p_value < 0.01 else "⚠️ Aceitável"
                     
                     window = 240

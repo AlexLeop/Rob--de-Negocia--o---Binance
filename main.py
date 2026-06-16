@@ -316,7 +316,7 @@ async def monitorar_par(executor, pair_idx, symbol_a, symbol_b, initial_amount, 
             TIMEFRAME_MINUTES = {"1m": 1, "3m": 3, "5m": 5, "15m": 15, "1h": 60}
             minutes_per_candle = TIMEFRAME_MINUTES.get(timeframe, 5)
             max_halflife_candles = 240 / minutes_per_candle
-            pearson_ok = sig.get('correlation', 0) >= 0.70
+            pearson_ok = sig.get('correlation', 0) >= 0.50
             
             if abs(sig['z_score']) > z_limit or peak_z_score != 0.0:
                 if abs(sig['z_score']) > abs(peak_z_score) and abs(sig['z_score']) > z_limit:
@@ -332,7 +332,7 @@ async def monitorar_par(executor, pair_idx, symbol_a, symbol_b, initial_amount, 
                 # Gatilho de Confirmação (Z-Score Hook): Recuo de 0.1 do pico
                 if abs(peak_z_score) - abs(sig['z_score']) >= 0.1:
                     if not pearson_ok:
-                        print(f"⚠️ [Par {pair_idx}] Aguardando: Correlação Quebrada (Pearson < 0.70). Abortando armadilha.")
+                        print(f"⚠️ [Par {pair_idx}] Aguardando: Correlação Quebrada (Pearson < 0.50). Abortando armadilha.")
                         peak_z_score = 0.0 # Cancela o gatilho se a correlação morreu
                         await asyncio.sleep(5); continue
                     elif sig['adx'] >= adx_limit:
