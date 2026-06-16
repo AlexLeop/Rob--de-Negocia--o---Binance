@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modern HFT Engine</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        modern: {
+                            bg: '#050505',
+                            panel: 'rgba(255, 255, 255, 0.03)',
+                            border: 'rgba(255, 255, 255, 0.08)',
+                            textPrimary: '#F8FAFC',
+                            textSecondary: '#94A3B8',
+                            accent: '#3B82F6',
+                            success: '#059669', /* Muted Emerald Green - NO NEON */
+                            danger: '#E11D48',  /* Muted Rose Red - NO NEON */
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background-color: #050505;
+            background-image: radial-gradient(circle at 50% 0%, #1E293B 0%, #050505 70%);
+            color: #F8FAFC; 
+            margin: 0; 
+            padding: 0; 
+            height: 100vh; 
+            overflow: hidden; 
+        }
+        
+        .glass-panel { 
+            background: rgba(20, 25, 35, 0.4);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.06); 
+            border-radius: 12px; 
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3); 
+        }
+        
+        .glass-header {
+            background: rgba(10, 15, 25, 0.7);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        .input-modern { 
+            background: rgba(0, 0, 0, 0.3); 
+            border: 1px solid rgba(255, 255, 255, 0.1); 
+            color: #F8FAFC; 
+            padding: 0.35rem 0.5rem; 
+            border-radius: 6px; 
+            font-size: 0.75rem; 
+            width: 100%; 
+            transition: all 0.2s ease; 
+        }
+        .input-modern:focus { 
+            outline: none; 
+            border-color: #3B82F6; 
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2); 
+            background: rgba(0, 0, 0, 0.5);
+        }
+
+        .data-grid th { 
+            background: rgba(255,255,255,0.02); 
+            text-align: left; 
+            padding: 0.6rem; 
+            font-weight: 500; 
+            font-size: 0.65rem; 
+            text-transform: uppercase; 
+            letter-spacing: 0.05em; 
+            color: #94A3B8; 
+            border-bottom: 1px solid rgba(255,255,255,0.05); 
+        }
+        .data-grid td { 
+            padding: 0.6rem; 
+            font-size: 0.75rem; 
+            border-bottom: 1px solid rgba(255,255,255,0.03); 
+            transition: background 0.2s;
+        }
+        .data-grid tr:hover td { 
+            background-color: rgba(255,255,255,0.02); 
+        }
+
+        .badge { 
+            padding: 0.15rem 0.5rem; 
+            border-radius: 9999px; 
+            font-size: 0.6rem; 
+            font-weight: 600; 
+            text-transform: uppercase; 
+            letter-spacing: 0.05em; 
+        }
+        
+        .btn-modern {
+            background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%);
+            box-shadow: 0 2px 10px 0 rgba(37, 99, 235, 0.3);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .btn-modern:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 15px rgba(37, 99, 235, 0.4);
+        }
+        .btn-modern:active {
+            transform: translateY(1px);
+        }
+    </style>
+</head>
+<body class="flex flex-col h-screen font-sans antialiased text-modern-textPrimary selection:bg-modern-accent selection:text-white">
+    
+    <!-- Modern Navigation Bar -->
+    <header class="glass-header h-12 flex items-center justify-between px-6 shrink-0 z-10 relative">
+        <div class="flex items-center gap-3">
+            <div class="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-500/20 to-purple-500/20 border border-white/10 flex items-center justify-center shadow-md">
+                <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+            </div>
+            <div>
+                <h1 class="text-[13px] font-semibold tracking-wide text-white leading-tight">Quantum Arbitrage</h1>
+                <p class="text-[9px] font-medium text-modern-textSecondary tracking-wider uppercase leading-tight">Statistical Engine v3.0</p>
+            </div>
+        </div>
+        
+        <div class="flex items-center gap-6">
+            <!-- Engine Toggle -->
+            <div class="flex items-center gap-3 bg-white/5 border border-white/5 rounded-full px-3 py-1 backdrop-blur-md">
+                <div class="flex flex-col items-end mr-1">
+                    <span class="text-[8px] text-modern-textSecondary uppercase tracking-widest font-bold leading-none mb-0.5">System Status</span>
+                    <span id="engine-status-text" class="text-[10px] font-bold text-modern-danger leading-none">OFFLINE</span>
+                </div>
+                <button id="btn-toggle-engine" class="w-8 h-5 bg-white/10 rounded-full relative transition-colors duration-300 focus:outline-none ring-1 ring-transparent focus:ring-modern-accent/50 cursor-pointer border border-white/10 overflow-hidden">
+                    <div id="toggle-knob" class="absolute left-0.5 top-0.5 w-4 h-4 rounded-full bg-white transition-transform duration-300 shadow-sm"></div>
+                </button>
+            </div>
+
+            <div class="h-6 w-px bg-white/10"></div>
+            
+            <!-- Global Equity -->
+            <div class="text-right">
+                <p class="text-[9px] text-modern-textSecondary uppercase tracking-widest font-bold mb-0.5">Total Equity</p>
+                <p id="kpi-balance" class="text-lg font-bold text-white font-mono tracking-tight leading-none">$0.00</p>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <div class="flex flex-1 overflow-hidden p-4 gap-4 z-0">
+        
+        <!-- Modern Sidebar -->
+        <aside class="w-[260px] glass-panel flex flex-col overflow-y-auto no-scrollbar shrink-0">
+            <div class="p-4 border-b border-white/5">
+                <h2 class="text-[10px] font-bold text-modern-accent uppercase tracking-widest flex items-center gap-1.5">
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path></svg>
+                    Engine Parameters
+                </h2>
+            </div>
+            
+            <div class="p-4 flex flex-col gap-4">
+                <!-- Asset Allocation -->
+                <div>
+                    <h3 class="text-[9px] font-bold text-white uppercase tracking-widest mb-2 flex items-center gap-1.5">
+                        <span class="w-1 h-2 rounded-full bg-blue-500"></span> Allocation Matrix
+                    </h3>
+                    <div class="space-y-2.5 bg-black/20 p-3 rounded-lg border border-white/5">
+                        <label class="flex items-center justify-between cursor-pointer">
+                            <span class="text-[11px] font-medium text-white">Global Auto-Scanner</span>
+                            <div class="relative">
+                                <input type="checkbox" id="cfg-auto" class="sr-only peer">
+                                <div class="w-7 h-4 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-modern-accent border border-white/10"></div>
+                            </div>
+                        </label>
+                        <div class="h-px bg-white/5"></div>
+                        <div>
+                            <label class="block text-[9px] text-modern-textSecondary uppercase tracking-widest mb-1">Manual Leg A</label>
+                            <input id="cfg-syma" class="input-modern font-mono" type="text" placeholder="BTCUSDT, ETHUSDT" />
+                        </div>
+                        <div>
+                            <label class="block text-[9px] text-modern-textSecondary uppercase tracking-widest mb-1">Manual Leg B</label>
+                            <input id="cfg-symb" class="input-modern font-mono" type="text" placeholder="SOLUSDT, BNBUSDT" />
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Math Logic -->
+                <div>
+                    <h3 class="text-[9px] font-bold text-white uppercase tracking-widest mb-2 flex items-center gap-1.5">
+                        <span class="w-1 h-2 rounded-full bg-purple-500"></span> Core Math
+                    </h3>
+                    <div class="grid grid-cols-2 gap-2.5">
+                        <div class="col-span-2">
+                            <label class="block text-[9px] text-modern-textSecondary uppercase tracking-widest mb-1">Timeframe</label>
+                            <select id="cfg-tf" class="input-modern appearance-none font-medium">
+                                <option value="1m">1 Minute</option>
+                                <option value="3m">3 Minutes</option>
+                                <option value="5m">5 Minutes</option>
+                                <option value="15m">15 Minutes</option>
+                                <option value="1h">1 Hour</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[9px] text-modern-textSecondary uppercase tracking-widest mb-1">Z-Score</label>
+                            <input id="cfg-z" class="input-modern font-mono text-center" step="0.1" type="number" />
+                        </div>
+                        <div>
+                            <label class="block text-[9px] text-modern-textSecondary uppercase tracking-widest mb-1">Min ADX</label>
+                            <input id="cfg-adx" class="input-modern font-mono text-center" type="number" />
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Financial Logic -->
+                <div>
+                    <h3 class="text-[9px] font-bold text-white uppercase tracking-widest mb-2 flex items-center gap-1.5">
+                        <span class="w-1 h-2 rounded-full bg-emerald-600"></span> Financial Limits
+                    </h3>
+                    <div class="space-y-2.5">
+                        <div>
+                            <label class="block text-[9px] text-modern-textSecondary uppercase tracking-widest mb-1">Leg Capital ($)</label>
+                            <input id="cfg-amt" class="input-modern font-mono" type="number" />
+                        </div>
+                        <div class="grid grid-cols-2 gap-2.5">
+                            <div>
+                                <label class="block text-[9px] text-modern-success uppercase tracking-widest mb-1 font-bold">Target ($)</label>
+                                <input id="cfg-tgt" class="input-modern font-mono text-modern-success border-modern-success/30 bg-modern-success/5" step="0.05" type="number" />
+                            </div>
+                            <div>
+                                <label class="block text-[9px] text-modern-danger uppercase tracking-widest mb-1 font-bold">Stop ($)</label>
+                                <input id="cfg-stop" class="input-modern font-mono text-modern-danger border-modern-danger/30 bg-modern-danger/5" step="0.5" type="number" />
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-[9px] text-modern-danger uppercase tracking-widest mb-1 font-bold">Global Drawdown (%)</label>
+                            <input id="cfg-dd" class="input-modern font-mono text-modern-danger border-modern-danger/50 bg-modern-danger/10 focus:border-modern-danger" step="1" type="number" />
+                        </div>
+                    </div>
+                </div>
+
+                <button id="btn-update-params" class="mt-1 w-full btn-modern text-white font-bold text-[10px] py-2.5 rounded-lg uppercase tracking-widest">
+                    Deploy
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Dashboard Content -->
+        <main class="flex-1 flex flex-col overflow-y-auto no-scrollbar gap-4">
+            
+            <!-- Modern Glass KPIs -->
+            <div class="grid grid-cols-4 gap-4 shrink-0">
+                <div class="glass-panel p-4 relative overflow-hidden group">
+                    <div class="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                    <h4 class="text-[9px] text-modern-textSecondary uppercase tracking-widest mb-1.5 font-medium">Net PnL</h4>
+                    <p id="kpi-pnl" class="text-xl font-bold font-mono tracking-tight">$0.00</p>
+                </div>
+                <div class="glass-panel p-4 relative overflow-hidden group">
+                    <div class="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                    <h4 class="text-[9px] text-modern-textSecondary uppercase tracking-widest mb-1.5 font-medium">Win Rate</h4>
+                    <p id="kpi-winrate" class="text-xl font-bold font-mono tracking-tight text-white">0.0%</p>
+                </div>
+                <div class="glass-panel p-4 relative overflow-hidden group">
+                    <div class="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                    <h4 class="text-[9px] text-modern-textSecondary uppercase tracking-widest mb-1.5 font-medium">Completed Trades</h4>
+                    <p id="kpi-trades" class="text-xl font-bold font-mono tracking-tight text-white">0</p>
+                </div>
+                <div class="glass-panel p-4 relative overflow-hidden group">
+                    <h4 class="text-[9px] text-modern-textSecondary uppercase tracking-widest mb-1.5 font-medium">Active Threads</h4>
+                    <p id="kpi-slots" class="text-xl font-bold font-mono tracking-tight text-modern-accent">0 / 3</p>
+                </div>
+            </div>
+
+            <!-- Active Slots Grid -->
+            <div class="flex items-center justify-between mt-1">
+                <h2 class="text-[13px] font-semibold text-white tracking-wide">Live Telemetry</h2>
+            </div>
+
+            <div id="pairs-container" class="grid grid-cols-3 gap-4 shrink-0">
+                <!-- Injetado via JS -->
+            </div>
+
+            <!-- Data Ledger -->
+            <div class="flex items-center justify-between mt-1">
+                <h2 class="text-[13px] font-semibold text-white tracking-wide">Operation Ledger</h2>
+            </div>
+            
+            <div class="glass-panel overflow-hidden mb-2 flex-1 flex flex-col min-h-[200px]">
+                <div class="overflow-x-auto overflow-y-auto no-scrollbar flex-1">
+                    <table class="w-full data-grid whitespace-nowrap">
+                        <thead class="sticky top-0 bg-[#0B0F19] z-10 shadow-md">
+                            <tr>
+                                <th>Timestamp</th>
+                                <th>Leg A</th>
+                                <th>Leg B</th>
+                                <th>Duration</th>
+                                <th>Trigger</th>
+                                <th class="text-right">Max Z</th>
+                                <th class="text-right">Return %</th>
+                                <th class="text-right">Realized PnL</th>
+                            </tr>
+                        </thead>
+                        <tbody id="trades-body">
+                            <!-- Injetado via JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <script>
+        function updateDashboard() {
+            fetch('/api/data')
+                .then(r => r.json())
+                .then(data => {
+                    // Update Header Toggle
+                    const statusEl = document.getElementById('engine-status-text');
+                    const knob = document.getElementById('toggle-knob');
+                    const toggleBtn = document.getElementById('btn-toggle-engine');
+
+                    if(data.is_running) {
+                        statusEl.textContent = 'ONLINE';
+                        statusEl.className = 'text-[10px] font-bold text-modern-success tracking-widest leading-none';
+                        toggleBtn.classList.add('bg-modern-success/20', 'border-modern-success/50');
+                        toggleBtn.classList.remove('bg-white/10', 'border-white/10');
+                        knob.style.transform = 'translateX(12px)';
+                        knob.classList.add('bg-modern-success');
+                        knob.classList.remove('bg-white');
+                    } else {
+                        statusEl.textContent = 'OFFLINE';
+                        statusEl.className = 'text-[10px] font-bold text-modern-danger tracking-widest leading-none';
+                        toggleBtn.classList.remove('bg-modern-success/20', 'border-modern-success/50');
+                        toggleBtn.classList.add('bg-white/10', 'border-white/10');
+                        knob.style.transform = 'translateX(0)';
+                        knob.classList.remove('bg-modern-success');
+                        knob.classList.add('bg-white');
+                    }
+                    
+                    document.getElementById('kpi-balance').textContent = `$${data.balance.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+                    
+                    // Update KPIs
+                    const pnlEl = document.getElementById('kpi-pnl');
+                    pnlEl.textContent = `${data.total_pnl >= 0 ? '+' : ''}$${data.total_pnl.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+                    pnlEl.className = `text-xl font-bold font-mono tracking-tight ${data.total_pnl >= 0 ? 'text-modern-success' : 'text-modern-danger'}`; // NO GLOW
+                    
+                    document.getElementById('kpi-winrate').textContent = `${data.win_rate.toFixed(1)}%`;
+                    document.getElementById('kpi-trades').textContent = data.trades.length;
+                    document.getElementById('kpi-slots').textContent = `${data.num_pairs} / 3`;
+
+                    // Update Form Values
+                    if(document.activeElement.tagName !== "INPUT" && document.activeElement.tagName !== "SELECT") {
+                        document.getElementById('cfg-auto').checked = data.config.AUTO_SCAN === "ON";
+                        document.getElementById('cfg-syma').value = data.config.SYMBOL_A;
+                        document.getElementById('cfg-symb').value = data.config.SYMBOL_B;
+                        document.getElementById('cfg-tf').value = data.config.TIMEFRAME;
+                        document.getElementById('cfg-z').value = parseFloat(data.config.Z_SCORE_LIMIT).toFixed(2);
+                        document.getElementById('cfg-adx').value = data.config.ADX_LIMIT;
+                        document.getElementById('cfg-amt').value = data.config.TRADE_AMOUNT_USD;
+                        document.getElementById('cfg-tgt').value = parseFloat(data.config.TARGET_PNL_USD).toFixed(2);
+                        document.getElementById('cfg-stop').value = parseFloat(data.config.STOP_LOSS_USD).toFixed(2);
+                        document.getElementById('cfg-dd').value = data.config.GLOBAL_STOP_LOSS_PCT;
+                    }
+
+                    // Pairs Grid
+                    const pairsContainer = document.getElementById('pairs-container');
+                    pairsContainer.innerHTML = '';
+                    
+                    if (data.num_pairs === 0) {
+                        pairsContainer.innerHTML = '<div class="col-span-3 text-center text-modern-textSecondary py-8 text-xs border border-dashed border-white/10 rounded-xl bg-white/[0.01]">Scanning market anomalies...</div>';
+                    } else {
+                        data.pairs.forEach((pair, idx) => {
+                            const zLimit = parseFloat(data.config.Z_SCORE_LIMIT);
+                            const currentZ = parseFloat(pair.zscore);
+                            const isExtreme = Math.abs(currentZ) >= zLimit;
+                            
+                            // SOLID MUTED COLORS. NO GLOW.
+                            const borderColor = isExtreme ? 'border-modern-danger/50' : 'border-white/5';
+                            const zColor = isExtreme ? 'text-modern-danger' : 'text-white';
+                            const badge = isExtreme ? '<span class="badge bg-modern-danger/20 text-modern-danger border border-modern-danger/50">CRIT</span>' : '<span class="badge bg-white/5 text-modern-textSecondary border border-white/10">MONITOR</span>';
+                            
+                            pairsContainer.innerHTML += `
+                            <div class="glass-panel p-4 ${borderColor} relative group transition-all duration-300">
+                                ${isExtreme ? '<div class="absolute top-0 left-0 w-full h-[2px] bg-modern-danger"></div>' : ''}
+                                <div class="flex justify-between items-center mb-4">
+                                    <span class="text-[9px] font-bold text-modern-textSecondary uppercase tracking-widest bg-white/5 px-1.5 py-0.5 rounded">T0${idx + 1}</span>
+                                    ${badge}
+                                </div>
+                                <div class="mb-4">
+                                    <div class="text-[13px] font-bold text-white tracking-wide mb-0.5 flex items-center gap-1.5">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-blue-400"></span> ${pair.symbol_a}
+                                    </div>
+                                    <div class="text-[11px] font-semibold text-modern-textSecondary tracking-wide flex items-center gap-1.5">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-purple-400"></span> ${pair.symbol_b}
+                                    </div>
+                                </div>
+                                <div class="grid grid-cols-2 gap-2 mb-3">
+                                    <div class="bg-black/20 p-2 rounded-lg border border-white/5">
+                                        <div class="text-[8px] text-modern-textSecondary uppercase tracking-widest mb-1 font-bold">Z-Score</div>
+                                        <div class="text-base font-mono font-bold ${zColor}">${pair.zscore}</div>
+                                    </div>
+                                    <div class="bg-black/20 p-2 rounded-lg border border-white/5">
+                                        <div class="text-[8px] text-modern-textSecondary uppercase tracking-widest mb-1 font-bold">ADX</div>
+                                        <div class="text-base font-mono font-bold text-white">${pair.adx}</div>
+                                    </div>
+                                </div>
+                                <div class="text-[9px] text-modern-accent font-mono truncate bg-modern-accent/10 py-1 px-2 rounded border border-modern-accent/20">
+                                    > ${pair.status}
+                                </div>
+                            </div>`;
+                        });
+                    }
+
+                    // Trades Table
+                    const tradesBody = document.getElementById('trades-body');
+                    let tradesHtml = '';
+                    if (data.trades.length === 0) {
+                        tradesHtml = '<tr><td colspan="8" class="text-center text-modern-textSecondary py-6 text-xs">Awaiting first execution...</td></tr>';
+                    } else {
+                        [...data.trades].reverse().slice(0, 15).forEach(trade => {
+                            const pnl = parseFloat(trade.pnl_usd);
+                            const pnlColor = pnl >= 0 ? 'text-modern-success' : 'text-modern-danger';
+                            tradesHtml += `
+                            <tr>
+                                <td class="font-mono text-modern-textSecondary">${trade.timestamp.split('.')[0]}</td>
+                                <td class="font-bold text-white">${trade.symbol_a}</td>
+                                <td class="font-bold text-white">${trade.symbol_b}</td>
+                                <td>${(trade.duration_min || 0).toFixed(1)}m</td>
+                                <td><span class="badge bg-white/5 border border-white/10">${trade.reason || 'UNKNOWN'}</span></td>
+                                <td class="text-right font-mono">${(trade.z_score || 0).toFixed(2)}</td>
+                                <td class="text-right font-mono">${(trade.roi_perc || 0).toFixed(2)}%</td>
+                                <td class="text-right font-mono font-bold ${pnlColor}">${pnl >= 0 ? '+' : ''}$${Math.abs(pnl).toFixed(2)}</td>
+                            </tr>`;
+                        });
+                    }
+                    tradesBody.innerHTML = tradesHtml;
+                });
+        }
+
+        document.getElementById('btn-toggle-engine').addEventListener('click', () => {
+            fetch('/api/toggle', {method: 'POST'}).then(() => updateDashboard());
+        });
+
+        document.getElementById('btn-update-params').addEventListener('click', () => {
+            const payload = {
+                AUTO_SCAN: document.getElementById('cfg-auto').checked ? "ON" : "OFF",
+                SYMBOL_A: document.getElementById('cfg-syma').value,
+                SYMBOL_B: document.getElementById('cfg-symb').value,
+                TIMEFRAME: document.getElementById('cfg-tf').value,
+                Z_SCORE_LIMIT: document.getElementById('cfg-z').value,
+                ADX_LIMIT: document.getElementById('cfg-adx').value,
+                TRADE_AMOUNT_USD: document.getElementById('cfg-amt').value,
+                TARGET_PNL_USD: document.getElementById('cfg-tgt').value,
+                STOP_LOSS_USD: document.getElementById('cfg-stop').value,
+                GLOBAL_STOP_LOSS_PCT: document.getElementById('cfg-dd').value
+            };
+            fetch('/api/config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            }).then(() => {
+                const btn = document.getElementById('btn-update-params');
+                const orig = btn.innerHTML;
+                btn.innerHTML = 'Saved <svg class="inline w-3 h-3 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>';
+                btn.style.background = '#059669'; // Muted green
+                setTimeout(() => {
+                    btn.innerHTML = orig;
+                    btn.style.background = '';
+                }, 2000);
+            });
+        });
+
+        setInterval(updateDashboard, 2000);
+        updateDashboard();
+    </script>
+</body>
+</html>

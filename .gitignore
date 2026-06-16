@@ -2,5 +2,8 @@
 CREDENCIAIS.txt
 __pycache__
 venv
-
-
+ParisTradeBot_Deploy.zip
+Sniper v27.mq5
+stablecoin_arb.py
+data/
+*.db

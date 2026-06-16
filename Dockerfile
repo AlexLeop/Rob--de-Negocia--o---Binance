@@ -9,7 +9,7 @@ COPY . .
 # Transforma o script em executável
 RUN chmod +x start.sh
 
-# Libera a porta 8501 do Streamlit
-EXPOSE 8501
+# Libera a porta 5000 do Flask
+EXPOSE 5000
 
 CMD ["./start.sh"]

@@ -1,7 +1,6 @@
 import pandas as pd
 import numpy as np
 import statsmodels.api as sm
-import pandas_ta as ta
 
 class PairsStrategy:
     @staticmethod
@@ -22,6 +21,35 @@ class PairsStrategy:
             
         halflife = -np.log(2) / res.params.iloc[1]
         return halflife
+
+    @staticmethod
+    def calc_adx(high: pd.Series, low: pd.Series, close: pd.Series, period: int = 14) -> pd.Series:
+        tr1 = high - low
+        tr2 = (high - close.shift()).abs()
+        tr3 = (low - close.shift()).abs()
+        tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+
+        up_move = high - high.shift()
+        down_move = low.shift() - low
+        
+        plus_dm = pd.Series(np.where((up_move > down_move) & (up_move > 0), up_move, 0.0), index=high.index)
+        minus_dm = pd.Series(np.where((down_move > up_move) & (down_move > 0), down_move, 0.0), index=high.index)
+
+        tr_smooth = tr.ewm(alpha=1/period, adjust=False).mean()
+        plus_di = 100 * plus_dm.ewm(alpha=1/period, adjust=False).mean() / tr_smooth.replace(0, np.nan)
+        minus_di = 100 * minus_dm.ewm(alpha=1/period, adjust=False).mean() / tr_smooth.replace(0, np.nan)
+        
+        dx = 100 * (plus_di - minus_di).abs() / (plus_di + minus_di).replace(0, np.nan)
+        adx = dx.ewm(alpha=1/period, adjust=False).mean()
+        return adx.fillna(0)
+
+    @staticmethod
+    def rolling_beta_vectorized(log_a: pd.Series, log_b: pd.Series, window: int) -> pd.Series:
+        """Rolling OLS beta via fórmula fechada: β = Cov(a,b) / Var(b)"""
+        cov = log_a.rolling(window).cov(log_b)
+        var = log_b.rolling(window).var()
+        beta = cov / var.replace(0, np.nan)
+        return beta.ffill().fillna(1.0)
 
     @staticmethod
     def calculate_indicators(df_a, df_b, config):
@@ -54,27 +82,12 @@ class PairsStrategy:
         log_a = np.log(df_temp['close_a'])
         log_b = np.log(df_temp['close_b'])
         
-        # BUG-04: Rolling OLS para Beta Dinâmico (Sintonizado com Z_WINDOW)
-        betas = []
-        for i in range(len(log_a)):
-            if i < config.Z_WINDOW:
-                betas.append(np.nan)
-                continue
-            # Janela deslizante para o cálculo do Beta
-            window_b = sm.add_constant(log_b.iloc[i-config.Z_WINDOW:i])
-            window_a = log_a.iloc[i-config.Z_WINDOW:i]
-            try:
-                model = sm.OLS(window_a, window_b).fit()
-                betas.append(model.params.iloc[1])
-            except:
-                betas.append(betas[-1] if betas else 1.0)
-        
         df = pd.DataFrame(index=df_temp.index)
-        df['beta'] = betas
+        df['beta'] = PairsStrategy.rolling_beta_vectorized(log_a, log_b, config.Z_WINDOW)
         df['spread'] = log_a - (df['beta'] * log_b)
         
         mean = df['spread'].rolling(window=config.Z_WINDOW).mean()
-        std = df['spread'].rolling(window=config.Z_WINDOW).std()
+        std = df['spread'].rolling(window=config.Z_WINDOW).std().replace(0, 1e-8)
         df['z_score'] = (df['spread'] - mean) / std
         
         # BUG-12: Half-life como valor escalar único (último calculado)
@@ -88,21 +101,22 @@ class PairsStrategy:
         df['correlation'] = ret_a.rolling(window=config.Z_WINDOW).corr(ret_b)
         
         # BUG-09: ADX Combinado (Máximo entre Ativo A e B)
-        adx_a = ta.adx(df_temp['high_a'], df_temp['low_a'], df_temp['close_a'], length=config.ADX_PERIOD)
-        adx_b = ta.adx(df_temp['high_b'], df_temp['low_b'], df_temp['close_b'], length=config.ADX_PERIOD)
+        adx_a = PairsStrategy.calc_adx(df_temp['high_a'], df_temp['low_a'], df_temp['close_a'], period=config.ADX_PERIOD)
+        adx_b = PairsStrategy.calc_adx(df_temp['high_b'], df_temp['low_b'], df_temp['close_b'], period=config.ADX_PERIOD)
         
-        val_a = adx_a['ADX_14'] if adx_a is not None else pd.Series(0, index=df.index)
-        val_b = adx_b['ADX_14'] if adx_b is not None else pd.Series(0, index=df.index)
-        df['adx'] = np.maximum(val_a, val_b)
+        df['adx'] = np.maximum(adx_a, adx_b)
 
         return df, df['beta'].iloc[-1]
 
     @staticmethod
     def get_signals(df, config):
-        last_row = df.iloc[-1] 
+        if df.empty or df.iloc[-1][['z_score','adx','correlation']].isna().any():
+            return None
+        last_row = df.dropna(subset=['z_score', 'adx', 'correlation']).iloc[-1]
         return {
             'z_score': last_row['z_score'],
             'adx': last_row['adx'],
             'half_life': last_row['half_life'],
-            'correlation': last_row['correlation']
+            'correlation': last_row['correlation'],
+            'beta': last_row['beta']
         }
