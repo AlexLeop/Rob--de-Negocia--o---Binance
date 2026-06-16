@@ -69,9 +69,9 @@ def _compute_coint_chunk(pairs_chunk, valid_data):
                     std = np.std(spread_window)
                     z_score = (spread[-1] - mean) / std if std > 0 else 0.0
                     
-                    # Filtro Ativo: Só retorna se o Z-score for expressivo e se houver amplitude suficiente para pagar taxas
+                    # Filtro Ativo: Só retorna se houver amplitude de pelo menos 1.5% para pagar taxas e slippage com folga
                     expected_profit = abs(z_score) * std if std > 0 else 0.0
-                    if abs(z_score) >= 1.0 and expected_profit >= 0.0035:
+                    if abs(z_score) >= 1.0 and expected_profit >= 0.015:
                         results.append({
                             "Ativo A": a,
                             "Ativo B": b,
