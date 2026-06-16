@@ -70,6 +70,7 @@ def api_data():
     config_data = {
         "AUTO_SCAN": db.get_config("AUTO_SCAN") or "ON",
         "TIMEFRAME": db.get_config("TIMEFRAME") or "5m",
+        "LEVERAGE": int(float(db.get_config("LEVERAGE") or 10)),
         "Z_SCORE_LIMIT": float(db.get_config("Z_SCORE_LIMIT") or 2.5),
         "ADX_LIMIT": int(float(db.get_config("ADX_LIMIT") or 40)),
         "TRADE_AMOUNT_USD": float(db.get_config("TRADE_AMOUNT_USD") or 1000.0),

@@ -96,6 +96,16 @@ class BinanceExecutor:
     async def execute_market_order(self, symbol: str, side: str, qty_usd: float):
         """Executa ordem a mercado e retorna detalhes do preenchimento."""
         try:
+            # Puxa a alavancagem configurada no painel e injeta na Binance
+            import core.database as db
+            leverage = int(float(db.get_config("LEVERAGE") or Config.LEVERAGE))
+            try:
+                await self.client.futures_change_leverage(symbol=symbol, leverage=leverage)
+                print(f"🔧 [Exchange] Alavancagem ajustada para {leverage}x em {symbol}.")
+            except Exception as e:
+                # Ignorar erros tipo "Margin type cannot be changed" ou "leverage already set"
+                pass
+
             ticker = await self.client.futures_symbol_ticker(symbol=symbol)
             price = float(ticker['price'])
             qty_coins = qty_usd / price

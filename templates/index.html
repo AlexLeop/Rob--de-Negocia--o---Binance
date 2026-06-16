@@ -219,6 +219,10 @@
                             <label class="block text-[9px] text-modern-textSecondary uppercase tracking-widest mb-1">Min ADX</label>
                             <input id="cfg-adx" class="input-modern font-mono text-center" type="number" />
                         </div>
+                        <div>
+                            <label class="block text-[9px] text-modern-textSecondary uppercase tracking-widest mb-1">Leverage</label>
+                            <input id="cfg-lev" class="input-modern font-mono text-center" type="number" />
+                        </div>
                     </div>
                 </div>
 
@@ -402,6 +406,7 @@
                         document.getElementById('cfg-syma').value = data.config.SYMBOL_A;
                         document.getElementById('cfg-symb').value = data.config.SYMBOL_B;
                         document.getElementById('cfg-tf').value = data.config.TIMEFRAME;
+                        document.getElementById('cfg-lev').value = data.config.LEVERAGE;
                         document.getElementById('cfg-z').value = parseFloat(data.config.Z_SCORE_LIMIT).toFixed(2);
                         document.getElementById('cfg-adx').value = data.config.ADX_LIMIT;
                         document.getElementById('cfg-amt').value = data.config.TRADE_AMOUNT_USD;
@@ -588,6 +593,7 @@
                 SYMBOL_A: document.getElementById('cfg-syma').value,
                 SYMBOL_B: document.getElementById('cfg-symb').value,
                 TIMEFRAME: document.getElementById('cfg-tf').value,
+                LEVERAGE: document.getElementById('cfg-lev').value,
                 Z_SCORE_LIMIT: document.getElementById('cfg-z').value,
                 ADX_LIMIT: document.getElementById('cfg-adx').value,
                 TRADE_AMOUNT_USD: document.getElementById('cfg-amt').value,
