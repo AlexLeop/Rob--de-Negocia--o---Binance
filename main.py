@@ -51,8 +51,17 @@ async def monitorar_par(executor, pair_idx, symbol_a, symbol_b, initial_amount, 
             if await db.get_config_async("BOT_STATUS") != "ON":
                 await asyncio.sleep(5); continue
             
-            base_amount = float(await db.get_config_async("TRADE_AMOUNT_USD") or initial_amount)
-            bonus_amount = float(await db.get_config_async(f"CICLO_BONUS_{pair_idx}") or 0.0)
+            lev_str = await db.get_config_async("LEVERAGE")
+            leverage = int(float(lev_str or Config.LEVERAGE))
+            base_margin = float(await db.get_config_async("TRADE_AMOUNT_USD") or initial_amount)
+            
+            # Corrige o Bug Crítico: Converte a Margem escolhida pelo usuário para o Valor Nocional real usando a Alavancagem
+            base_amount = base_margin * leverage
+            
+            # O Bônus do ciclo também era alocado em Margem, então multiplicamos também
+            bonus_margin = float(await db.get_config_async(f"CICLO_BONUS_{pair_idx}") or 0.0)
+            bonus_amount = bonus_margin * leverage
+            
             # Limita a exposição máxima com bônus para nunca exceder o dobro do valor base (Controle de Risco)
             amount = min(base_amount + bonus_amount, base_amount * 2.0)
             
